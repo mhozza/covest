@@ -10,9 +10,11 @@ from intervaltree import IntervalTree
 
 
 def compute_histogram(intervals):
+    read_length = 0
     segments = dict()
     for i in intervals:
         id, start, end, rlen = i
+        read_length += rlen
         if not id in segments:
             segments[id] = IntervalTree(0, rlen)
         segments[id].add_to_interval(start, end)
@@ -25,20 +27,7 @@ def compute_histogram(intervals):
             histogram[c] += 1
             max_c = max(max_c, c)
 
-    return [histogram[i] for i in range(max_c + 1)]
-
-
-def compute_lengths(intervals):
-    read_length = 0
-    ref_length = 0
-    segments = dict()
-    for i in intervals:
-        id, start, end, rlen = i
-        segments[id] = rlen
-        read_length += rlen
-
-    ref_length = sum(segments.values())
-    return ref_length, read_length
+    return [histogram[i] for i in range(max_c + 1)], read_length
 
 
 def plot_hist(hist):
@@ -61,10 +50,10 @@ def main(args):
             data = json.load(f)
             if 'hist' in data:
                 hist = data['hist']
-                lengths = data['lenghts']
+                read_length = data['lenght']
             else:
                 hist = data
-                lengths = (0, 0)
+                read_length = (0, 0)
     else:
         if args.output:
             out_basename = args.output[0]
@@ -72,15 +61,14 @@ def main(args):
             out_basename = fname
 
         intervals = load_sam(fname)
-        hist = compute_histogram(intervals)
-        lengths = compute_lengths(intervals)
+        hist, read_length = compute_histogram(intervals)
 
         hist_fname = '%s.hist.json' % out_basename
         with open(hist_fname, 'w') as f:
-            json.dump({'hist': hist, 'lengths': lengths}, f)
+            json.dump({'hist': hist, 'length': read_length}, f)
 
     print(hist)
-    print(lengths)
+    print(read_length)
     plot_hist(hist)
 
 
