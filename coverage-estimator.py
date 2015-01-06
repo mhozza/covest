@@ -3,7 +3,7 @@ from collections import defaultdict
 import argparse
 import json
 
-from matplotlib.pyplot import bar, draw, show
+from matplotlib.pyplot import bar, draw, show, axvline
 import pysam
 
 from intervaltree import IntervalTree
@@ -30,8 +30,10 @@ def compute_histogram(intervals):
     return [histogram[i] for i in range(max_c + 1)], read_length
 
 
-def plot_hist(hist):
+def plot_hist(hist, avg=None):
     bar(range(len(hist)), hist)
+    if avg is not None:
+        axvline(avg, color='r')
     draw()
     show()
 
@@ -50,7 +52,7 @@ def main(args):
             data = json.load(f)
             if 'hist' in data:
                 hist = data['hist']
-                read_length = data['lenght']
+                read_length = data['length']
             else:
                 hist = data
                 read_length = (0, 0)
@@ -69,7 +71,11 @@ def main(args):
 
     print(hist)
     print(read_length)
-    plot_hist(hist)
+    if args.genome_length:
+        avg = read_length / args.genome_length[0]
+    else:
+        avg = None
+    plot_hist(hist, avg)
 
 
 if __name__ == '__main__':
@@ -77,5 +83,6 @@ if __name__ == '__main__':
     parser.add_argument('input', nargs=1, type=str, help='input SAM file name')
     parser.add_argument('-o', '--output', nargs=1, type=str, help='output base name')
     parser.add_argument('-p', '--plot', action='store_true', help='only plot histogram')
+    parser.add_argument('--genome_length', nargs=1, type=int, help='length of genome')
     args = parser.parse_args()
     main(args)
