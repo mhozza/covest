@@ -72,7 +72,6 @@ def compute_coverage(all_kmers, unique_kmers, observed_ones, k, r, error_rate=No
     estimated_ones = unique_kmers * cov * exp(-cov)
     error_ones = observed_ones - estimated_ones
 
-    # ???!!! este neviem ci tu nema byt skor all_kmers, ale asi nie
     alpha = error_ones / (unique_kmers + observed_ones)
     print('Alpha:', alpha)
     estimated_p = estimate_p(cov, alpha)
@@ -83,8 +82,8 @@ def compute_coverage(all_kmers, unique_kmers, observed_ones, k, r, error_rate=No
         print('Coverage estimated from given p:', cov / kmer_correct_prob,
               kmer_to_read_coverage(cov / kmer_correct_prob))
     else:
-        print('Correct kmer prob:', estimated_p, kmer_correct_prob)
-        print('Error rate:', 1 - estimated_p ** (1.0 / k), error_rate)
+        print('Correct kmer prob:', estimated_p)
+        print('Error rate:', 1 - estimated_p ** (1.0 / k))
 
     print('Coverage estimated from estimated p:', cov / estimated_p,
           kmer_to_read_coverage(cov / estimated_p))
