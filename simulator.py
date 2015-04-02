@@ -31,9 +31,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
     parser.add_argument('-g', '--genome-size', type=int,
                         default=DEFAULT_GENOME_SIZE, help='Genome size')
-    parser.add_argument('-c', '--coverage', type=int,
+    parser.add_argument('-c', '--coverage', type=float,
                         default=DEFAULT_COVERAGE, help='Coverage')
-    parser.add_argument('-e', '--error-rate', type=int,
+    parser.add_argument('-e', '--error-rate', type=float,
                         default=DEFAULT_ERROR_RATE, help='Error rate')
     parser.add_argument('-r', '--read-length', type=int,
                         default=DEFAULT_READ_LENGTH, help='Read length')
