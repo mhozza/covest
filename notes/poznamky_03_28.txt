@@ -1,0 +1,7 @@
+ako funguje khmer coverage estimation:
+- vypyta si cielovy coverage C
+- potom ide od C/2 po 2C
+- pocita sucet cov*count -> sum_cov, a sumu count -> n_cov
+  -> cize mame 2 cisla: pocet vsetkych kmerov dokopy (s pokrytim medzi C/2 a 2C) a pocet unikatnych kmerov (s tym istym pokrytim)
+- vysledok je sum_cov/n_cov
+

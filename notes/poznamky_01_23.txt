@@ -1,0 +1,7 @@
+- chceme priamo data z intervalaca z konkretneho kontigu
+- poratat to z tych bazovych pravdepodobnosti?
+- pozor na kraje
+- pohrat sa s tou technickou strankou
+- potom zahrnut zlozitejsie veci
+- velvet opakuje k baz m,edi kusmi
+- scaffold obsahuje nka

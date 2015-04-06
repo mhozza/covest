@@ -1,0 +1,6 @@
+jednoduchy model
+- hladam najpravdepodobnejsie C -> priemerna hodnota ak nemam chyby
+- model s chybami - poisson, znizeny o chybne ready = pre tie spravne
+- hamming distance 1 priratat
+- ignorovat repeaty, zatial nahodna sekvencia, aj chybne aj dobre ready
+- aky vzorec pouzivaju v khmery
