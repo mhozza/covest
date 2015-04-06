@@ -41,34 +41,42 @@ def load_dist(fname):
     return all_kmers, unique_kmers, observed_ones
 
 
+def fix_coverage(computed_cov, precision=0.0001):
+    cov = computed_cov
+    while(True):
+        new_cov = (cov - cov * exp(-cov)) / (1 - exp(-cov) - cov * exp(-cov))
+        if abs(new_cov - computed_cov) < precision:
+            return cov
+        elif new_cov < computed_cov:
+            cov += precision
+        else:
+            cov -= precision
+
+
 def compute_coverage(all_kmers, unique_kmers, observed_ones, k, r, error_rate=None):
     def kmer_to_read_coverage(c):
         return c * r / (r - k + 1)
 
-    if error_rate:
+    if error_rate is not None:
         kmer_correct_prob = (1 - error_rate) ** k
 
     cov = all_kmers / unique_kmers
     print('Coverage:', cov)
+    cov = fix_coverage(cov)
+    print('Fixed Coverage:', cov)
 
     # one iteration
-    # for i in range(1):
-    estimated_ones = unique_kmers * cov * exp(-cov)
-    estimated_zeros = unique_kmers * exp(-cov)
-    # print estimated_ones, estimated_zeros, estimated_zeros + estimated_ones
-    cov = (all_kmers + estimated_ones) / (unique_kmers + estimated_ones + estimated_zeros)
+    # for i in range(100):
+    # estimated_ones = unique_kmers * cov * exp(-cov)
+    # estimated_zeros = unique_kmers * exp(-cov)
+    # # print estimated_ones, estimated_zeros, estimated_zeros + estimated_ones
+    # cov = (all_kmers + estimated_ones) / (unique_kmers + estimated_ones + estimated_zeros)
+    # print('Coverage:', cov)
 
-    print('Coverage:', cov)
+    old_unique_kmers = unique_kmers  # from hist >2
+    unique_kmers = old_unique_kmers / (1.0 - exp(-cov) - cov * exp(-cov))
+    # # # print(old_unique_kmers, unique_kmers, unique_kmers - old_unique_kmers)
 
-    # old_unique_kmers = unique_kmers  # from hist >2
-    # unique_kmers = unique_kmers / (1 - exp(-cov) - cov * exp(-cov))
-    # # print(old_unique_kmers, unique_kmers, unique_kmers - old_unique_kmers)
-    # all_kmers += unique_kmers - old_unique_kmers  # blbost, bo zaratava nie len 1tkove ale aj 0ve a tie nechceme
-    # cov = all_kmers / unique_kmers
-
-    print('Coverage:', cov)
-
-    # unique_kmers - su od 2ky vyssie
     estimated_ones = unique_kmers * cov * exp(-cov)
     error_ones = observed_ones - estimated_ones
 
@@ -76,7 +84,7 @@ def compute_coverage(all_kmers, unique_kmers, observed_ones, k, r, error_rate=No
     print('Alpha:', alpha)
     estimated_p = estimate_p(cov, alpha)
 
-    if error_rate:
+    if error_rate is not None:
         print('Correct kmer prob (est, given):', estimated_p, kmer_correct_prob)
         print('Error rate (est, given):', 1 - estimated_p ** (1.0 / k), error_rate)
         print('Coverage estimated from given p:', cov / kmer_correct_prob,

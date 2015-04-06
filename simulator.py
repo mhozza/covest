@@ -17,14 +17,25 @@ def other(base):
     return BASES[b]
 
 
-def main(genome_size, read_length, error_rate, read_count):
+def main(fname, genome_size, read_length, error_rate, read_count, error_free_fname=None):
     genome = ''.join(random.choice(BASES) for _ in range(genome_size))
-    for i in range(read_count):
-        pos = random.randrange(genome_size - read_length)
-        read = genome[pos:pos + read_length]
-        read = ''.join(b if random.random() >= error_rate else other(b) for b in read)
-        print('>read_{}-'.format(i, pos))
-        print(read)
+    with open(fname, 'w') as f:
+        if error_free_fname:
+            eff = open(error_free_fname)
+
+        for i in range(read_count):
+            pos = random.randrange(genome_size - read_length)
+            original_read = genome[pos:pos + read_length]
+            read = ''.join(b if random.random() >= error_rate else other(b)
+                           for b in original_read)
+            f.write('>read_{}-{}\n'.format(i, pos))
+            f.write('{}\n'.format(read))
+            if error_free_fname:
+                eff.write('>read_{}-{}\n'.format(i, pos))
+                eff.write('{}\n'.format(read))
+
+        if error_free_fname:
+            eff.close()
 
 
 if __name__ == '__main__':
@@ -37,7 +48,11 @@ if __name__ == '__main__':
                         default=DEFAULT_ERROR_RATE, help='Error rate')
     parser.add_argument('-r', '--read-length', type=int,
                         default=DEFAULT_READ_LENGTH, help='Read length')
+    parser.add_argument('-f', '--error-free', help='Error free output file')
+    parser.add_argument('output', help='Output file')
+
     args = parser.parse_args()
 
     read_count = int(round((args.coverage * args.genome_size) / float(args.read_length)))
-    main(args.genome_size, args.read_length, args.error_rate, read_count)
+    main(args.output, args.genome_size, args.read_length, args.error_rate,
+         read_count, args.error_free)
