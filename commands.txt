@@ -1,0 +1,6 @@
+bowtie2-inspect -s index > index.sum
+bowtie2-build genome.ctg.fasta ctg_index
+bowtie2 -x ctg_index -U frag_1.fastq -S mapping_ctg.out
+
+art_bin_VanillaIceCream/art_illumina -i hg19/fa/chr14.fa -o chr14_illumina -f 10 -l 100 -ef
+./sam_to_fasta.py data/chr14_illumina4_errFree.sam
