@@ -21,7 +21,7 @@ def main(fname, genome_size, read_length, error_rate, read_count, error_free_fna
     genome = ''.join(random.choice(BASES) for _ in range(genome_size))
     with open(fname, 'w') as f:
         if error_free_fname:
-            eff = open(error_free_fname)
+            eff = open(error_free_fname, 'w')
 
         for i in range(read_count):
             pos = random.randrange(genome_size - read_length)
@@ -32,7 +32,7 @@ def main(fname, genome_size, read_length, error_rate, read_count, error_free_fna
             f.write('{}\n'.format(read))
             if error_free_fname:
                 eff.write('>read_{}-{}\n'.format(i, pos))
-                eff.write('{}\n'.format(read))
+                eff.write('{}\n'.format(original_read))
 
         if error_free_fname:
             eff.close()

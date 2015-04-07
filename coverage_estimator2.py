@@ -62,16 +62,16 @@ def compute_coverage(all_kmers, unique_kmers, observed_ones, k, r, error_rate=No
 
     cov = all_kmers / unique_kmers
     print('Coverage:', cov)
-    cov = fix_coverage(cov)
-    print('Fixed Coverage:', cov)
+    # cov = fix_coverage(cov)
+    # print('Fixed Coverage:', cov)
 
-    # one iteration
+    # fix coverage
     # for i in range(100):
-    # estimated_ones = unique_kmers * cov * exp(-cov)
-    # estimated_zeros = unique_kmers * exp(-cov)
+    estimated_ones = unique_kmers * cov * exp(-cov)
+    estimated_zeros = unique_kmers * exp(-cov)
     # # print estimated_ones, estimated_zeros, estimated_zeros + estimated_ones
-    # cov = (all_kmers + estimated_ones) / (unique_kmers + estimated_ones + estimated_zeros)
-    # print('Coverage:', cov)
+    cov = (all_kmers + estimated_ones) / (unique_kmers + estimated_ones + estimated_zeros)
+    print('Fixed coverage:', cov)
 
     old_unique_kmers = unique_kmers  # from hist >2
     unique_kmers = old_unique_kmers / (1.0 - exp(-cov) - cov * exp(-cov))
