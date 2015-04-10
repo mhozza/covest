@@ -3,7 +3,7 @@ import glob
 import os
 from collections import defaultdict
 
-path = 'experiment1/'
+path = 'experiment2/'
 files = sorted(glob.glob(os.path.join(path, '*.out')))
 
 
@@ -43,7 +43,7 @@ def parse_estimate(fname):
 
 
 def format_table(header, lines, template, line_template, header_cell_template,
-                 cell_template, round_floats=2):
+                 cell_template, round_floats=4):
     lbody = ''
     for c in header:
         lbody += header_cell_template.format(cbody=c)
@@ -79,6 +79,12 @@ def format_table_html(header, lines):
     return format_table(header, lines, template, line_template,
                         header_cell_template, cell_template)
 
+
+def kmer_to_read_coverage(c, k, read_length=100):
+    if c is not None:
+        return c * read_length / (read_length - k + 1)
+
+
 table_lines = defaultdict(dict)
 
 for fname in files:
@@ -100,9 +106,9 @@ for fname in files:
             table_lines[key]['estimated_error_rate'] = est_err
     else:
         if ef:
-            table_lines[key]['khmer_ef_coverage'] = parse_khmer(fname)
+            table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
         else:
-            table_lines[key]['khmer_coverage'] = parse_khmer(fname)
+            table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
 
 header = [
     'original_coverage', 'original_error_rate', 'original_k',
