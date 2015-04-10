@@ -42,8 +42,9 @@ def compute_coverage(all_kmers, unique_kmers, observed_ones, k, r, error_rate=No
     unique_kmers /= (1.0 - exp(-cov) - cov * exp(-cov))
     # compute alpha (error read ratio)
     estimated_ones = unique_kmers * cov * exp(-cov)
-    error_ones = max(0, observed_ones - estimated_ones)
-    alpha = error_ones / total_unique_kmers
+    estimated_zeros = unique_kmers * exp(-cov)
+    error_ones = max(0.0, observed_ones - estimated_ones)
+    alpha = error_ones / (total_unique_kmers + estimated_zeros)
     print('Alpha:', alpha)
     # estimate probability of correct kmer
     estimated_p = estimate_p(cov, alpha)
