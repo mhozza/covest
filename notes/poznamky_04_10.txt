@@ -1,0 +1,5 @@
+- dokoncit korekciu
+- skusit zanalyzovat repeaty
+- ? overit ako vyzeraju separatne histogramy pre chybne a korektne kmery (nasekat na kmery a poratat)
+- nakodit si khmer
+- pozriet sa na kolizie v chybach (mozno brona)
