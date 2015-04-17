@@ -19,15 +19,15 @@ def single_hash(b):
 def hash_kmer(kmer):
     h = 0
     for b in kmer:
-        h << 2
+        h <<= 2
         h |= single_hash(b)
     return h
 
 
 def rehash(old_hash, b, k):
     l = 2 * k
-    h = old_hash & (1 << (l - 2)) - 1
-    h << 2
+    h = old_hash & ((1 << (l - 2)) - 1)
+    h <<= 2
     h |= single_hash(b)
     return h
 

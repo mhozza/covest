@@ -3,17 +3,22 @@ import glob
 import os
 from collections import defaultdict
 
-path = 'experiment2/'
+path = 'experiment5/'
 files = sorted(glob.glob(os.path.join(path, '*.out')))
+error = False
 
 
-def parse_fname(fname):
+def parse_fname(fname, error=True):
     basename, ext = os.path.splitext(os.path.splitext(fname)[0])
     parts = basename.split('_')
     cov = parts[1][1:]
-    error = parts[2][1:]
-    k = parts[3][1:]
-    return int(cov), float(error), int(k), ext, parts[2][0] == 'f'
+    if error:
+        error = parts[2][1:]
+        k = parts[3][1:]
+        return float(cov), float(error), int(k), ext, parts[2][0] == 'f'
+    else:
+        k = parts[2][1:]
+        return float(cov), None, int(k), ext, False  # todo decide this otherwise
 
 
 def parse_khmer(fname):
@@ -27,6 +32,7 @@ def parse_khmer(fname):
 
 def parse_estimate(fname):
     err = "'Error rate (est"
+    err2 = "'Error rate:'"
     cov = "'Coverage estimated from estimated p:'"
     # ', 3.1537225216529357, 4.44186270655343)
     coverage = None
@@ -37,6 +43,8 @@ def parse_estimate(fname):
             parts = line.split(',')
             if parts[0] == err:
                 error = float(parts[2])
+            if parts[0] == err2:
+                error = float(parts[1])
             if parts[0] == cov:
                 coverage = float(parts[2])
     return coverage, error
@@ -88,7 +96,7 @@ def kmer_to_read_coverage(c, k, read_length=100):
 table_lines = defaultdict(dict)
 
 for fname in files:
-    cov, error, k, ext, ef = parse_fname(fname)
+    cov, error, k, ext, ef = parse_fname(fname, error)
 
     key = (cov, error, k)
 

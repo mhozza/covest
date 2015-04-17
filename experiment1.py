@@ -12,11 +12,12 @@ khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genom
             ' {infile_base}.fa {infile_base}_k{k}.dist {cov}'
 estimator = './coverage_estimator2.py {infile_base}_k{k}.dist -e {error} -k {k}'
 
-path = 'experiment2'
+path = 'experiment3'
 
 error_rates = [0.01, 0.03, 0.05, 0.1]
-coverages = [1, 2, 4, 10, 16]
-ks = [15, 20, 25, 30]
+coverages = [0.1, 0.5, 1, 2, 4, 10, 50]
+coverages = [30]
+ks = [20, 30]
 
 
 def run(command, output=None):
