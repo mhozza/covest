@@ -2,7 +2,6 @@
 from math import exp, log, fsum
 from scipy.misc import comb, factorial
 from scipy.optimize import minimize
-import numpy
 import argparse
 from inverse import inverse
 
@@ -10,7 +9,8 @@ DEFAULT_K = 20
 DEFAULT_READ_LENGTH = 100
 ERROR_RATE = 0.03
 
-numpy.seterr('raise')
+# INF = 1e100
+INF = float('inf')
 
 
 def estimate_p(cc, alpha):
@@ -36,6 +36,8 @@ def load_dist(fname):
 
 
 def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
+    if unique_kmers == 0:
+        return 0.0, 1.0
     total_unique_kmers = unique_kmers + observed_ones
     # compute coverage from hist >=2
     cov = all_kmers / unique_kmers
@@ -51,10 +53,13 @@ def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
     error_ones = max(0.0, observed_ones - estimated_ones)
     alpha = error_ones / (total_unique_kmers + estimated_zeros)
     # estimate probability of correct kmer and error rate
-    estimated_p = estimate_p(cov, alpha)
+    estimated_p = max(0.0, estimate_p(cov, alpha))
     e = 1 - estimated_p ** (1.0 / k)
     # return corrected coverage and error estimate
-    return cov / estimated_p, e
+    if estimated_p > 0:
+        return cov / estimated_p, e
+    else:
+        return 0, e
 
 
 def tr_poisson(l, j):
@@ -72,18 +77,21 @@ def tr_poisson(l, j):
 
 def safe_log(x):
     if x == 0:
-        return float('-inf')
+        return -INF
     return log(x)
 
 
 def compute_loglikelihood(hist, r, k, c, err):
-    if err < 0 or err > 1:
-        return float('-inf')
+    if err < 0 or err >= 1 or c <= 0:
+        return -INF
     # lambda for kmers with s errors
     l_s = lambda s: c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s
     # expected probability of kmers with s errors and coverage >= 1
     n_s = lambda s: comb(k, s) * (3 ** s) * (1.0 - exp(-l_s(s)))
     sum_n_s = fsum(n_s(t) for t in range(k + 1))
+
+    if sum_n_s == 0:  # division by zero fix
+        sum_n_s = 1
     # portion of kmers with s errors
     a_s = lambda s: n_s(s) / sum_n_s
     # probability that unique kmer has coverage j (j > 0)
@@ -92,13 +100,14 @@ def compute_loglikelihood(hist, r, k, c, err):
     return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)))
 
 
-def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05, error_rate=None):
+def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
+                     error_rate=None, orig_coverage=None):
     likelihood_f = lambda x: -compute_loglikelihood(
         hist, args.read_length, args.kmer_size, x[0], x[1]
     )
     x0 = [guessed_c, guessed_e]
-    res = minimize(likelihood_f, x0, bounds=((0.0, None), (0.0, 1.0)), options={'disp': True})
-    # res = minimize(likelihood_f, x0, options={'disp': True})
+    res = minimize(likelihood_f, x0, bounds=((0.0, None), (0.0, 1.0)), options={'disp': False})
+    # res = minimize(likelihood_f, x0, options={'disp': False})
     cov, e = res.x
 
     # function for conversion between kmer and base coverage
@@ -107,20 +116,31 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05, error_rate=None):
     print('Guessed coverage:', kmer_to_read_coverage(guessed_c))
     print('Final coverage:', kmer_to_read_coverage(cov))
     if error_rate is not None:
-        print('Given error_rate:', error_rate)
-    print('Guessed error_rate:', guessed_e)
-    print('Final error_rate:', e)
+        print('Given error rate:', error_rate)
+    print('Guessed error rate:', guessed_e)
+    print('Final error rate:', e)
+
+    if error_rate is not None and orig_coverage is not None:
+        print('Original loglikelihood:', -likelihood_f([orig_coverage, error_rate]))
+    print('Guessed loglikelihood:', -likelihood_f(x0))
+    print('Estimated loglikelihood:', -likelihood_f([cov, e]))
+
     return cov, e
 
 
 def main(args):
-    error_rate = args.error_rate if 'error_rate' in args else None
+    orig_error_rate = args.error_rate if 'error_rate' in args else None
+    orig_coverage = args.coverage if 'coverage' in args else None
     all_kmers, unique_kmers, observed_ones, hist = load_dist(args.input_histogram)
     cov, e = compute_coverage_apx(
         all_kmers, unique_kmers, observed_ones,
         args.kmer_size, args.read_length
     )
-    compute_coverage(hist, args.read_length, args.kmer_size, cov, e, error_rate)
+
+    compute_coverage(
+        hist, args.read_length, args.kmer_size, cov, e,
+        orig_error_rate, orig_coverage,
+    )
 
 
 if __name__ == '__main__':
@@ -131,5 +151,6 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--read-length', type=int,
                         default=DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
+    parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     args = parser.parse_args()
     main(args)

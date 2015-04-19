@@ -3,9 +3,9 @@ import glob
 import os
 from collections import defaultdict
 
-path = 'experiment5/'
+path = 'experiment2/'
 files = sorted(glob.glob(os.path.join(path, '*.out')))
-error = False
+error = True
 
 
 def parse_fname(fname, error=True):
@@ -33,21 +33,47 @@ def parse_khmer(fname):
 def parse_estimate(fname):
     err = "'Error rate (est"
     err2 = "'Error rate:'"
+    err3 = "'Final error rate:'"
     cov = "'Coverage estimated from estimated p:'"
+    cov2 = "'Final coverage:'"
+    gcov = "'Guessed coverage:'"
+    gerr = "'Guessed error rate:'"
+    orig_l = "'Original loglikelihood:'"
+    guessed_l = "'Guessed loglikelihood:'"
+    est_l = "'Estimated loglikelihood:'"
     # ', 3.1537225216529357, 4.44186270655343)
     coverage = None
     error = None
+    guessed_c = None
+    guessed_e = None
+    orig_likelihood = None
+    guessed_likelihood = None
+    est_likelihood = None
     with open(fname) as f:
         for i, line in enumerate(f):
             line = line[1:len(line) - 2]
             parts = line.split(',')
             if parts[0] == err:
                 error = float(parts[2])
-            if parts[0] == err2:
+            if parts[0] == err2 or parts[0] == err3:
                 error = float(parts[1])
             if parts[0] == cov:
                 coverage = float(parts[2])
-    return coverage, error
+            if parts[0] == cov2:
+                coverage = float(parts[1])
+            if parts[0] == gcov:
+                guessed_c = float(parts[1])
+            if parts[0] == gerr:
+                guessed_e = float(parts[1])
+            if parts[0] == orig_l:
+                orig_likelihood = float(parts[1])
+            if parts[0] == guessed_l:
+                guessed_likelihood = float(parts[1])
+            if parts[0] == est_l:
+                est_likelihood = float(parts[1])
+
+    return coverage, error, guessed_c, guessed_e,\
+        orig_likelihood, guessed_likelihood, est_likelihood
 
 
 def format_table(header, lines, template, line_template, header_cell_template,
@@ -73,7 +99,8 @@ def format_table_html(header, lines):
     <html>
     <head>
     <!-- Latest compiled and minified CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+    <link rel="stylesheet"
+        href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
     </head>
     <table class="table table-condensed table-hover">
         {thead}
@@ -106,12 +133,18 @@ for fname in files:
 
     if ext == '.est':
         if ef:
-            est_cov_ef, _ = parse_estimate(fname)
+            est_cov_ef, _, g_cov_ef, _, _, _, _ = parse_estimate(fname)
             table_lines[key]['estimated_ef_coverage'] = est_cov_ef
+            table_lines[key]['guessed_ef_coverage'] = g_cov_ef
         else:
-            est_cov, est_err = parse_estimate(fname)
+            est_cov, est_err, g_cov, g_err, ol, gl, el = parse_estimate(fname)
             table_lines[key]['estimated_coverage'] = est_cov
             table_lines[key]['estimated_error_rate'] = est_err
+            table_lines[key]['guessed_coverage'] = g_cov
+            table_lines[key]['guessed_error_rate'] = g_err
+            table_lines[key]['original_loglikelihood'] = ol
+            table_lines[key]['estimated_loglikelihood'] = el
+            table_lines[key]['guessed_loglikelihood'] = gl
     else:
         if ef:
             table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
@@ -122,6 +155,8 @@ header = [
     'original_coverage', 'original_error_rate', 'original_k',
     'estimated_coverage', 'estimated_error_rate',
     'estimated_ef_coverage',
+    'guessed_coverage', 'guessed_error_rate', 'guessed_ef_coverage',
+    'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
     'khmer_coverage',
     'khmer_ef_coverage',
 ]
