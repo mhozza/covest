@@ -5,6 +5,9 @@ from scipy.optimize import minimize
 import argparse
 from inverse import inverse
 
+# from utils import print_wrap as pw
+
+
 DEFAULT_K = 20
 DEFAULT_READ_LENGTH = 100
 ERROR_RATE = 0.03
@@ -81,9 +84,7 @@ def safe_log(x):
     return log(x)
 
 
-def compute_loglikelihood(hist, r, k, c, err):
-    if err < 0 or err >= 1 or c <= 0:
-        return -INF
+def compute_probabilities(r, k, c, err):
     # lambda for kmers with s errors
     l_s = lambda s: c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s
     # expected probability of kmers with s errors and coverage >= 1
@@ -96,7 +97,39 @@ def compute_loglikelihood(hist, r, k, c, err):
     a_s = lambda s: n_s(s) / sum_n_s
     # probability that unique kmer has coverage j (j > 0)
     p_j = lambda j: fsum(a_s(s) * tr_poisson(l_s(s), j) for s in range(k + 1))
+    return p_j
 
+
+def compute_loglikelihood(hist, r, k, c, err):
+    if err < 0 or err >= 1 or c <= 0:
+        return -INF
+    p_j = compute_probabilities(r, k, c, err)
+    return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)))
+
+
+def compute_probabilities_with_repeats(r, k, c, err, q1, q):
+    p_oj_d = dict()
+
+    def p_oj(o, j):
+        if (o, j) not in p_oj_d:
+            if o == 1:
+                res = compute_probabilities(r, k, c, err)(j)
+            else:
+                res = fsum(p_oj(1, i) * p_oj(o - 1, j - i) for i in range(1, j + 1))
+            p_oj_d[(o, j)] = res
+        return p_oj_d[(o, j)]
+
+    b_o = lambda o: q1 if o == 1 else (1 - q1) * q * (1 - q) ** (o - 2)
+    p_j = lambda j: fsum(
+        b_o(o) * p_oj(o, j) for o in range(1, j + 1)
+    )
+    return p_j
+
+
+def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
+    if err < 0 or err >= 1 or c <= 0:
+        return -INF
+    p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q)
     return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)))
 
 
@@ -106,8 +139,11 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
         hist, args.read_length, args.kmer_size, x[0], x[1]
     )
     x0 = [guessed_c, guessed_e]
-    res = minimize(likelihood_f, x0, bounds=((0.0, None), (0.0, 1.0)), options={'disp': False})
-    # res = minimize(likelihood_f, x0, options={'disp': False})
+    res = minimize(
+        likelihood_f, x0,
+        bounds=((0.0, None), (0.0, 1.0)),
+        options={'disp': False}
+    )
     cov, e = res.x
 
     # function for conversion between kmer and base coverage
@@ -128,6 +164,42 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
     return cov, e
 
 
+def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
+                             guessed_q1=1.0, guessed_q=0.0,
+                             error_rate=None, orig_coverage=None):
+    likelihood_f = lambda x: -compute_loglikelihood_with_repeats(
+        hist, args.read_length, args.kmer_size, x[0], x[1], x[2], x[3],
+    )
+    x0 = [guessed_c, guessed_e, 1, 0]
+
+    res = minimize(
+        likelihood_f, x0,
+        bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+        options={'disp': False}
+    )
+    # res = minimize(likelihood_f, x0, options={'disp': False})
+    cov, e, q1, q = res.x
+
+    # function for conversion between kmer and base coverage
+    kmer_to_read_coverage = lambda c: c * r / (r - k + 1)
+
+    print('Guessed coverage:', kmer_to_read_coverage(guessed_c))
+    print('Final coverage:', kmer_to_read_coverage(cov))
+    if error_rate is not None:
+        print('Given error rate:', error_rate)
+    print('Guessed error rate:', guessed_e)
+    print('Final error rate:', e)
+
+    if error_rate is not None and orig_coverage is not None:
+        print('Original loglikelihood:', -likelihood_f([orig_coverage, error_rate, q1, q]))
+    print('Guessed loglikelihood:', -likelihood_f(x0))
+    print('Estimated loglikelihood:', -likelihood_f([cov, e, q1, q]))
+
+    print('Estimated q1 and q:', q1, q)
+
+    return cov, e
+
+
 def main(args):
     orig_error_rate = args.error_rate if 'error_rate' in args else None
     orig_coverage = args.coverage if 'coverage' in args else None
@@ -137,9 +209,9 @@ def main(args):
         args.kmer_size, args.read_length
     )
 
-    compute_coverage(
+    compute_coverage_repeats(
         hist, args.read_length, args.kmer_size, cov, e,
-        orig_error_rate, orig_coverage,
+        error_rate=orig_error_rate, orig_coverage=orig_coverage,
     )
 
 
