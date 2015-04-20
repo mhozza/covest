@@ -7,19 +7,20 @@ from matplotlib.pyplot import bar, draw, show, axvline
 import pysam
 
 from intervaltree import IntervalTree
-# from coverage_probability import all_cov_prob_dist
+from coverage_probability import all_cov_prob_dist
+import kmer_hist
 
 
 def compute_histogram(ref_sequences, intervals):
     segments = dict()
-    read_length = 0
+    read_count = 0
 
     for id, length in ref_sequences:
         segments[id] = IntervalTree(0, length)
 
     for id, start, end in intervals:
-        read_length += end - start
         segments[id].add_to_interval(start, end)
+        read_count += 1
 
     histogram = defaultdict(int)
     max_c = 0
@@ -29,7 +30,7 @@ def compute_histogram(ref_sequences, intervals):
             histogram[c] += 1
             max_c = max(max_c, c)
 
-    return [histogram[i] for i in range(max_c + 1)], read_length
+    return [histogram[i] for i in range(max_c + 1)], read_count
 
 
 def plot_hist(hist, avg=None):
@@ -65,38 +66,47 @@ def main(args):
             data = json.load(f)
             if 'hist' in data:
                 hist = data['hist']
-                read_length = data['length']
             else:
                 hist = data
-                read_length = (0, 0)
+
+            if 'read_count' in data:
+                read_count = data['read_count']
+            else:
+                read_count = None
     else:
         if args.output:
             out_basename = args.output[0]
         else:
             out_basename = fname
 
-        ref_sequences = load_summary(summary_fname)
-        intervals = load_sam(fname)
+        # ref_sequences = load_summary(summary_fname)
+        # intervals = load_sam(fname)
 
-        hist, read_length = compute_histogram(ref_sequences, intervals)
+        # hist, read_count = compute_histogram(ref_sequences, intervals)
+
+        reads = kmer_hist.load_fastq(fname)
+
+        hist, read_count = kmer_hist.compute_histogram(reads)
 
         hist_fname = '%s.hist.json' % out_basename
         with open(hist_fname, 'w') as f:
-            json.dump({'hist': hist, 'length': read_length}, f)
+            json.dump({'hist': hist, 'read_count': read_count}, f)
 
     print(hist)
-    print(read_length)
+    total_read_length = sum(i * k for i, k in enumerate(hist))
     if args.genome_length:
-        avg = read_length / args.genome_length[0]
+        avg = total_read_length / args.genome_length[0]
     else:
         avg = None
     plot_hist(hist, avg)
 
+    if read_count is None:
+        read_count = total_read_length / 101
+
     if args.estimate:
-        # dist = all_cov_prob_dist(read_length, hist)
-        print(sum(i * k for i, k in enumerate(hist)), read_length)
-        # plot_hist(dist)
-        # print(dist)
+        dist = all_cov_prob_dist(total_read_length, read_count, hist)
+        plot_hist(dist)
+        print(dist)
 
 
 if __name__ == '__main__':
