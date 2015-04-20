@@ -11,14 +11,19 @@ error = True
 def parse_fname(fname, error=True):
     basename, ext = os.path.splitext(os.path.splitext(fname)[0])
     parts = basename.split('_')
-    cov = parts[1][1:]
     if error:
+        cov = parts[1][1:]
         error = parts[2][1:]
         k = parts[3][1:]
         return float(cov), float(error), int(k), ext, parts[2][0] == 'f'
     else:
+        ef = False
+        cov = parts[1][1:]
+        if cov[-1] == 'f':
+            ef = True
+            cov = cov[:-1]
         k = parts[2][1:]
-        return float(cov), None, int(k), ext, False  # todo decide this otherwise
+        return float(cov), None, int(k), ext, ef
 
 
 def parse_khmer(fname):
