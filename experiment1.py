@@ -13,15 +13,15 @@ khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genom
 # estimator = './coverage_estimator2.py {infile_base}_k{k}.dist -e {error} -k {k}'
 estimator = './coverage_estimator3.py {infile_base}_k{k}.dist -e {error} -k {k} -c {cov}'
 
-path = 'experiment2'
+path = 'experiment2_3'
 
 error_rates = [0.01, 0.03, 0.05, 0.1]
 # error_rates = [0.05, 0.1]
 coverages = [0.1, 0.5, 1, 2, 4, 10, 30, 50]
 # coverages = [0.1, .5]
-ks = [20, 30]
+ks = [11, 15, 21, 25, 31]
 
-generate = False
+generate = True
 compute_hist = generate
 run_khmer = True
 
