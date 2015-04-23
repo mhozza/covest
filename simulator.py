@@ -17,6 +17,16 @@ def other(base):
     return BASES[b]
 
 
+def reverse_complement(seq):
+    complement = {
+        'G': 'C',
+        'C': 'G',
+        'A': 'T',
+        'T': 'A',
+    }
+    return ''.join(complement[x] for x in reversed(seq))
+
+
 def main(fname, genome_size, read_length, error_rate, read_count, error_free_fname=None):
     genome = ''.join(random.choice(BASES) for _ in range(genome_size))
     with open(fname, 'w') as f:
@@ -26,6 +36,8 @@ def main(fname, genome_size, read_length, error_rate, read_count, error_free_fna
         for i in range(read_count):
             pos = random.randrange(genome_size - read_length)
             original_read = genome[pos:pos + read_length]
+            original_read = original_read if random.randrange(2)\
+                else reverse_complement(original_read)
             read = ''.join(b if random.random() >= error_rate else other(b)
                            for b in original_read)
             f.write('>read_{}-{}\n'.format(i, pos))
