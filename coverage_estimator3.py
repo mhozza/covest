@@ -1,10 +1,11 @@
 #! /usr/bin/env python
 from math import exp, log, fsum
+import itertools
 from scipy.misc import comb, factorial
 from scipy.optimize import minimize
 import argparse
 from inverse import inverse
-
+import matplotlib.pyplot as plt
 # from utils import print_wrap as pw
 
 
@@ -28,7 +29,9 @@ def load_dist(fname):
 
     with open(fname, 'r') as f:
         for line in f:
-            i, cnt, sofar, percent = [fn(x) for fn, x in zip([int, int, int, float], line.split())]
+            i, cnt, sofar, percent = [
+                fn(x) for fn, x in zip([int, int, int, float], line.split())
+            ]
             hist.append(cnt)
             if i == 1:
                 observed_ones = cnt
@@ -60,7 +63,9 @@ def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
     e = 1 - estimated_p ** (1.0 / k)
     # return corrected coverage and error estimate
     if estimated_p > 0:
-        return cov / estimated_p, e
+        # function for conversion between kmer and base coverage
+        kmer_to_read_coverage = lambda c: c * r / (r - k + 1)
+        return kmer_to_read_coverage(cov / estimated_p), e
     else:
         return 0, e
 
@@ -68,9 +73,9 @@ def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
 def tr_poisson(l, j):
     try:
         if exp(l) == 1.0:  # precision fix
-            return 1.0
+            return 0.0
     except OverflowError:
-        print l, j
+        print 'Owerflow:', l, j
         return 0.0
 
     if factorial(j) == 'inf':
@@ -85,6 +90,8 @@ def safe_log(x):
 
 
 def compute_probabilities(r, k, c, err):
+    # read to kmer coverage
+    c = c * (r - k + 1) / r
     # lambda for kmers with s errors
     l_s = lambda s: c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s
     # expected probability of kmers with s errors and coverage >= 1
@@ -142,15 +149,13 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
     res = minimize(
         likelihood_f, x0,
         bounds=((0.0, None), (0.0, 1.0)),
-        options={'disp': False}
+        options={'disp': True}
     )
-    cov, e = res.x
+    # res = minimize(likelihood_f, x0, options={'disp': True})
+    cov, e = minimize_grid(likelihood_f, res.x, bounds=((0.0, None), (0.0, 1.0)))
 
-    # function for conversion between kmer and base coverage
-    kmer_to_read_coverage = lambda c: c * r / (r - k + 1)
-
-    print('Guessed coverage:', kmer_to_read_coverage(guessed_c))
-    print('Final coverage:', kmer_to_read_coverage(cov))
+    print('Guessed coverage:', guessed_c)
+    print('Final coverage:', cov)
     if error_rate is not None:
         print('Given error rate:', error_rate)
     print('Guessed error rate:', guessed_e)
@@ -165,8 +170,9 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
 
 
 def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
-                             guessed_q1=1.0, guessed_q=0.0,
+                             guessed_q1=0.5, guessed_q=0.5,
                              error_rate=None, orig_coverage=None):
+
     likelihood_f = lambda x: -compute_loglikelihood_with_repeats(
         hist, args.read_length, args.kmer_size, x[0], x[1], x[2], x[3],
     )
@@ -180,11 +186,8 @@ def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
     # res = minimize(likelihood_f, x0, options={'disp': False})
     cov, e, q1, q = res.x
 
-    # function for conversion between kmer and base coverage
-    kmer_to_read_coverage = lambda c: c * r / (r - k + 1)
-
-    print('Guessed coverage:', kmer_to_read_coverage(guessed_c))
-    print('Final coverage:', kmer_to_read_coverage(cov))
+    print('Guessed coverage:', guessed_c)
+    print('Final coverage:', cov)
     if error_rate is not None:
         print('Given error rate:', error_rate)
     print('Guessed error rate:', guessed_e)
@@ -200,6 +203,84 @@ def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
     return cov, e
 
 
+def plot_probs(r, k, hist, est_c, est_e, guess_c, guess_e, orig_c=None, orig_e=None):
+    hs = float(sum(hist))
+    hp = [f / hs for f in hist]
+    ep_f = compute_probabilities(r, k, est_c, est_e)
+    gp_f = compute_probabilities(r, k, guess_c, guess_e)
+    if orig_c is not None and orig_e is not None:
+        op_f = compute_probabilities(r, k, orig_c, orig_e)
+    else:
+        op_f = lambda _: 0
+    ep = [0] + [ep_f(j) for j in range(1, len(hist))]
+    gp = [0] + [gp_f(j) for j in range(1, len(hist))]
+    op = [0] + [op_f(j) for j in range(1, len(hist))]
+    plt.plot(
+        range(len(hp)), hp, 'ko',
+        label='hist',
+        ms=8,
+    )
+    plt.plot(
+        range(len(ep)), ep, 'ro',
+        label='est: C:{:.3f} E:{:.3f}'.format(est_c, est_e),
+        ms=6,
+    )
+    plt.plot(
+        range(len(gp)), gp, 'go',
+        label='guess: C:{:.3f} E:{:.3f}'.format(guess_c, guess_e),
+        ms=5,
+    )
+    plt.plot(
+        range(len(op)), op, 'co',
+        label='orig: C:{:.3f} E:{:.3f}'.format(orig_c, orig_e),
+        ms=4,
+    )
+    plt.legend()
+    plt.show()
+
+
+def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
+    def generate_grid(args, step, max_depth):
+        def generate_grid_single(var):
+            return (
+                var * step ** d
+                for d in range(-max_depth, max_depth + 1) if d != 0
+            )
+
+        def filter_bounds(var_grid, i):
+            if bounds is None or len(bounds) >= i or len(bounds[1]) != 2:
+                return var_grid
+            low, high = bounds[i]
+            return (
+                var for var in var_grid
+                if (low is None or var >= low) and (high is None or var <= high)
+            )
+
+        var_grids = [
+            list(filter_bounds(generate_grid_single(var), i))
+            for i, var in enumerate(args)
+        ]
+        return itertools.product(*var_grids)
+
+    min_val = fn(initial_guess)
+    min_args = initial_guess
+    step = 1.1
+    grid_depth = 3
+    diff = 1
+    while (diff > 0.1 or step > 1.001):
+        diff = 0
+        for args in generate_grid(min_args, step, grid_depth):
+            val = fn(args)
+            if val < min_val:
+                min_val = val
+                min_args = args
+                diff += min_val - val
+        if diff < 1:
+            step = 1 + (step - 1) * 0.9
+
+    return min_args
+
+
 def main(args):
     orig_error_rate = args.error_rate if 'error_rate' in args else None
     orig_coverage = args.coverage if 'coverage' in args else None
@@ -209,11 +290,21 @@ def main(args):
         args.kmer_size, args.read_length
     )
 
-    compute_coverage_repeats(
+    # We were unable to guess cov and e, try to estimate from some fixed valid data instead
+    if cov == 0 and e == 1:
+        cov = 1
+        e = 0.5
+
+    cov_est = compute_coverage_repeats if args.repeats else compute_coverage
+    cov2, e2 = cov_est(
         hist, args.read_length, args.kmer_size, cov, e,
         error_rate=orig_error_rate, orig_coverage=orig_coverage,
     )
-
+    if args.plot:
+        plot_probs(
+            args.read_length, args.kmer_size, hist,
+            cov2, e2, cov, e, orig_coverage, orig_error_rate,
+        )
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
@@ -224,5 +315,8 @@ if __name__ == '__main__':
                         default=DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
+    parser.add_argument('--plot', action='store_true', help='Plot probabilities')
+    parser.add_argument('--repeats', action='store_true', help='Estimate vith repeats')
+
     args = parser.parse_args()
     main(args)
