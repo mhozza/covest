@@ -8,3 +8,4 @@ python-dateutil==2.3
 pytz==2014.10
 scipy==0.14.1
 six==1.9.0
+biopython=1.65
