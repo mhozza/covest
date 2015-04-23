@@ -3,14 +3,15 @@ import glob
 import os
 from collections import defaultdict
 
-path = 'experiment2/'
+path = 'experiment2_1/'
 files = sorted(glob.glob(os.path.join(path, '*.out')))
 error = True
 
 
 def parse_fname(fname, error=True):
-    basename, ext = os.path.splitext(os.path.splitext(fname)[0])
-    parts = basename.split('_')
+    base, ext = os.path.splitext(os.path.splitext(fname)[0])
+    base = os.path.basename(base)
+    parts = base.split('_')
     if error:
         cov = parts[1][1:]
         error = parts[2][1:]
