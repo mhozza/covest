@@ -1,27 +1,31 @@
 #! /usr/bin/env python
-import argparse
 import glob
 import os
 from collections import defaultdict
 
+path = 'experiment3/'
+files = sorted(glob.glob(os.path.join(path, '*.out')))
+error = True
+times = True
+
 
 def parse_fname(fname, error=True):
-    base, ext = os.path.splitext(os.path.splitext(fname)[0])
-    base = os.path.basename(base)
-    parts = base.split('_')
+    basename, ext = os.path.splitext(os.path.splitext(fname)[0])
+    parts = basename.split('_')
+
+    run = parts[1][1:]
+    cov = parts[1 + 1][1:]
     if error:
-        cov = parts[1][1:]
-        error = parts[2][1:]
-        k = parts[3][1:]
-        return float(cov), float(error), int(k), ext, parts[2][0] == 'f'
+        error = parts[2 + 1][1:]
+        k = parts[3 + 1][1:]
+        return int(run), float(cov), float(error), int(k), ext, parts[2 + 1][0] == 'f'
     else:
         ef = False
-        cov = parts[1][1:]
         if cov[-1] == 'f':
             ef = True
             cov = cov[:-1]
-        k = parts[2][1:]
-        return float(cov), None, int(k), ext, ef
+        k = parts[2 + 1][1:]
+        return int(run), float(cov), None, int(k), ext, ef
 
 
 def parse_khmer(fname):
@@ -123,65 +127,53 @@ def kmer_to_read_coverage(c, k, read_length=100):
         return c * read_length / (read_length - k + 1)
 
 
-def main(args):
-    path = args.path
-    files = sorted(glob.glob(os.path.join(path, '*.out')))
-    error = args.no_error
+table_lines = defaultdict(dict)
 
-    table_lines = defaultdict(dict)
+for fname in files:
+    run, cov, error, k, ext, ef = parse_fname(fname, error)
 
-    for fname in files:
-        cov, error, k, ext, ef = parse_fname(fname, error)
+    key = (cov, error, k, run)
 
-        key = (cov, error, k)
+    table_lines[key]['original_coverage'] = cov
+    table_lines[key]['original_error_rate'] = error
+    table_lines[key]['original_k'] = k
+    table_lines[key]['run'] = run
 
-        table_lines[key]['original_coverage'] = cov
-        table_lines[key]['original_error_rate'] = error
-        table_lines[key]['original_k'] = k
-
-        if ext == '.est':
-            if ef:
-                est_cov_ef, _, g_cov_ef, _, _, _, _ = parse_estimate(fname)
-                table_lines[key]['estimated_ef_coverage'] = est_cov_ef
-                table_lines[key]['guessed_ef_coverage'] = g_cov_ef
-            else:
-                est_cov, est_err, g_cov, g_err, ol, gl, el = parse_estimate(fname)
-                table_lines[key]['estimated_coverage'] = est_cov
-                table_lines[key]['estimated_error_rate'] = est_err
-                table_lines[key]['guessed_coverage'] = g_cov
-                table_lines[key]['guessed_error_rate'] = g_err
-                table_lines[key]['original_loglikelihood'] = ol
-                table_lines[key]['estimated_loglikelihood'] = el
-                table_lines[key]['guessed_loglikelihood'] = gl
+    if ext == '.est':
+        if ef:
+            est_cov_ef, _, g_cov_ef, _, _, _, _ = parse_estimate(fname)
+            table_lines[key]['estimated_ef_coverage'] = est_cov_ef
+            table_lines[key]['guessed_ef_coverage'] = g_cov_ef
         else:
-            if ef:
-                table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
-            else:
-                table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
+            est_cov, est_err, g_cov, g_err, ol, gl, el = parse_estimate(fname)
+            table_lines[key]['estimated_coverage'] = est_cov
+            table_lines[key]['estimated_error_rate'] = est_err
+            table_lines[key]['guessed_coverage'] = g_cov
+            table_lines[key]['guessed_error_rate'] = g_err
+            table_lines[key]['original_loglikelihood'] = ol
+            table_lines[key]['estimated_loglikelihood'] = el
+            table_lines[key]['guessed_loglikelihood'] = gl
+    else:
+        if ef:
+            table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
+        else:
+            table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
 
-    header = [
-        'original_coverage', 'original_error_rate', 'original_k',
-        'estimated_coverage', 'estimated_error_rate',
-        'estimated_ef_coverage',
-        'guessed_coverage', 'guessed_error_rate', 'guessed_ef_coverage',
-        'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
-        'khmer_coverage',
-        'khmer_ef_coverage',
-    ]
+header = [
+    'run',
+    'original_coverage', 'original_error_rate', 'original_k',
+    'estimated_coverage', 'estimated_error_rate',
+    'estimated_ef_coverage',
+    'guessed_coverage', 'guessed_error_rate', 'guessed_ef_coverage',
+    'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
+    'khmer_coverage',
+    'khmer_ef_coverage',
+]
 
-    print(format_table_html(
-        header,
-        sorted(
-            list(table_lines.values()),
-            key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'])
-        )
-    ))
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Parse experiment output and generate table')
-    parser.add_argument('path', help='Experiment')
-    parser.add_argument('-f', '--format', default='html', help='Table format')
-    parser.add_argument('--no-error', action='store_true', help='Error is unknown')
-    args = parser.parse_args()
-    main(args)
+print(format_table_html(
+    header,
+    sorted(
+        list(table_lines.values()),
+        key=lambda x: (x['run'], x['original_coverage'], x['original_error_rate'], x['original_k'])
+    )
+))
