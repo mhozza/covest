@@ -74,13 +74,9 @@ def tr_poisson(l, j):
     try:
         if exp(l) == 1.0:  # precision fix
             return 0.0
+        return min(1.0, (l ** j) / (factorial(j) * (exp(l) - 1.0)))
     except OverflowError:
-        print 'Owerflow:', l, j
         return 0.0
-
-    if factorial(j) == 'inf':
-        return 0.0
-    return min(1.0, (l ** j) / (factorial(j) * (exp(l) - 1.0)))
 
 
 def safe_log(x):
