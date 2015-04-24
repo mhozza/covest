@@ -72,7 +72,7 @@ def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
 
 
 def tr_poisson(l, j):
-    with numpy.errstate(over='error'):
+    with numpy.errstate(over='raise'):
         try:
             if exp(l) == 1.0:  # precision fix
                 return 0.0
