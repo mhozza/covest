@@ -6,6 +6,7 @@ from scipy.optimize import minimize
 import argparse
 from inverse import inverse
 import matplotlib.pyplot as plt
+import numpy
 # from utils import print_wrap as pw
 
 
@@ -71,12 +72,13 @@ def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
 
 
 def tr_poisson(l, j):
-    try:
-        if exp(l) == 1.0:  # precision fix
+    with numpy.errstate(over='error'):
+        try:
+            if exp(l) == 1.0:  # precision fix
+                return 0.0
+            return min(1.0, (l ** j) / (factorial(j) * (exp(l) - 1.0)))
+        except OverflowError:
             return 0.0
-        return min(1.0, (l ** j) / (factorial(j) * (exp(l) - 1.0)))
-    except OverflowError:
-        return 0.0
 
 
 def safe_log(x):
