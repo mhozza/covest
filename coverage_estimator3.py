@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 from math import exp, log, fsum
 import itertools
+from collections import defaultdict
 from scipy.misc import comb, factorial
 from scipy.optimize import minimize
 import argparse
@@ -26,20 +27,24 @@ def load_dist(fname):
     unique_kmers = 0
     all_kmers = 0.0
     observed_ones = 0
-    hist = list()
+    hist = defaultdict(int)
+    max_hist = 0
 
     with open(fname, 'r') as f:
         for line in f:
-            i, cnt, sofar, percent = [
-                fn(x) for fn, x in zip([int, int, int, float], line.split())
-            ]
-            hist.append(cnt)
+            l = line.split()
+            i = int(l[0])
+            cnt = int(l[1])
+            hist[i] = cnt
+            max_hist = max(max_hist, i)
             if i == 1:
                 observed_ones = cnt
             if i >= 2:
                 unique_kmers += cnt
                 all_kmers += i * cnt
-    return all_kmers, unique_kmers, observed_ones, hist
+
+    hist_l = [hist[i] for i in range(max_hist)]
+    return all_kmers, unique_kmers, observed_ones, hist_l
 
 
 def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
