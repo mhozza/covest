@@ -82,7 +82,7 @@ def tr_poisson(l, j):
             if exp(l) == 1.0:  # precision fix
                 return 0.0
             return min(1.0, (l ** j) / (factorial(j) * (exp(l) - 1.0)))
-        except OverflowError:
+        except (OverflowError, FloatingPointError):
             return 0.0
 
 
