@@ -126,7 +126,7 @@ def kmer_to_read_coverage(c, k, read_length=100):
 def main(args):
     path = args.path
     files = sorted(glob.glob(os.path.join(path, '*.out')))
-    error = args.no_error
+    error = not args.no_error
 
     table_lines = defaultdict(dict)
 
