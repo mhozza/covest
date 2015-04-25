@@ -21,7 +21,7 @@ error_rates = [0.01, 0.03, 0.05, 0.1]
 # error_rates = [0.05, 0.1]
 coverages = [0.1, 0.5, 1, 2, 4, 10, 30, 50]
 # coverages = [0.1, .5]
-ks = [11, 15, 21, 25, 31]
+ks = [21]
 
 generate = False
 compute_hist = True

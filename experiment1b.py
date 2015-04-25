@@ -4,7 +4,7 @@ import subprocess
 from copy import deepcopy
 
 source = 'data/chr14.fa'
-# source = 'data/yeast/chrXV.fa'
+source = 'data/yeast/chrXV.fa'
 
 simulator = 'art_bin_VanillaIceCream/art_illumina -i {src} -o {infile_base} -f {cov} -l 100 -ef'
 simulator_ef = './sam_to_fasta.py {infile_base}_errFree.sam'
@@ -18,10 +18,10 @@ khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genom
             ' {infile} {infile_base}_k{k}.dist {khmer_cov}'
 estimator = './coverage_estimator3.py {infile_base}_k{k}.dist -k {k} --repeats'
 
-path = 'experiment2h'
+path = 'experiment2e'
 
 coverages = [0.1, 0.5, 1, 2, 4, 10, 50]
-ks = [20, 30]
+ks = [21]
 
 generate = False
 use_jellyfish = True
