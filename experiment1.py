@@ -4,7 +4,7 @@ import subprocess
 from copy import deepcopy
 
 simulator = './simulator.py {infile_base}.fa -e {error} -c {cov} -f {infile_base_ef}.fa'
-khmer_hash = './khmer/scripts/load-into-counting.py -x 1e8'\
+khmer_hash = './khmer/scripts/load-into-counting.py -x 1e9'\
              ' -k {k} hash_table.kh {infile_base}.fa'
 khmer_hist = './khmer/scripts/abundance-dist.py'\
              ' hash_table.kh {infile_base}.fa {infile_base}_k{k}.dist'
