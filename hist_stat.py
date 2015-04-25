@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 from collections import defaultdict
 import argparse
 
@@ -36,7 +37,7 @@ def hist_stat(hist):
             if last == 0:
                 print z
             z = 0
-            last = v
+        last = v
 
 
 def main(args):
