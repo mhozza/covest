@@ -179,7 +179,7 @@ def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
     likelihood_f = lambda x: -compute_loglikelihood_with_repeats(
         hist, args.read_length, args.kmer_size, x[0], x[1], x[2], x[3],
     )
-    x0 = [guessed_c, guessed_e, 1, 0]
+    x0 = [guessed_c, guessed_e, guessed_q1, guessed_q]
 
     res = minimize(
         likelihood_f, x0,
@@ -187,7 +187,11 @@ def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
         options={'disp': False}
     )
     # res = minimize(likelihood_f, x0, options={'disp': False})
-    cov, e, q1, q = res.x
+    # cov, e, q1, q = res.x
+    cov, e, q1, q = minimize_grid(
+        likelihood_f, res.x,
+        bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+    )
 
     print('Guessed coverage:', guessed_c)
     print('Final coverage:', cov)
