@@ -17,10 +17,28 @@ ERROR_RATE = 0.03
 
 # INF = 1e100
 INF = float('inf')
+trim_hist = True
 
 
 def estimate_p(cc, alpha):
     return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
+
+
+def hist_trim(hist):
+    z = 0
+    last = -1
+    trim = len(hist)
+    for i, v in enumerate(hist):
+        if v == 0:
+            z += 1
+        else:
+            if last == 0:
+                if i > 100 and z > len(hist) // 10:
+                    trim = i - z
+                    break
+            z = 0
+        last = v
+    return hist[:trim]
 
 
 def load_dist(fname):
@@ -44,6 +62,8 @@ def load_dist(fname):
                 all_kmers += i * cnt
 
     hist_l = [hist[i] for i in range(max_hist)]
+    if trim_hist:
+        hist_l = hist_trim(hist_l)
     return all_kmers, unique_kmers, observed_ones, hist_l
 
 
@@ -114,7 +134,7 @@ def compute_loglikelihood(hist, r, k, c, err):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities(r, k, c, err)
-    return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)))
+    return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j])
 
 
 def compute_probabilities_with_repeats(r, k, c, err, q1, q):
@@ -140,7 +160,7 @@ def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q)
-    return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)))
+    return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j])
 
 
 def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
