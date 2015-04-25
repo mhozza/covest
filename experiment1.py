@@ -4,8 +4,10 @@ import subprocess
 from copy import deepcopy
 
 simulator = './simulator.py {infile_base}.fa -e {error} -c {cov} -f {infile_base_ef}.fa'
-khmer_hash = './khmer/scripts/load-into-counting.py -x 1e9'\
-             ' -k {k} hash_table.kh {infile_base}.fa'
+jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o table.jf'
+jellyfish_hist = 'jellyfish histo table.jf_0 -o {infile_base}_k{k}.dist'
+khmer_count = './khmer/scripts/load-into-counting.py -x 1e9'\
+              ' -k {k} hash_table.kh {infile_base}.fa'
 khmer_hist = './khmer/scripts/abundance-dist.py'\
              ' hash_table.kh {infile_base}.fa {infile_base}_k{k}.dist'
 khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genome-size.py'\
@@ -21,9 +23,10 @@ coverages = [0.1, 0.5, 1, 2, 4, 10, 30, 50]
 # coverages = [0.1, .5]
 ks = [11, 15, 21, 25, 31]
 
-generate = True
-compute_hist = generate
-run_khmer = True
+generate = False
+compute_hist = True
+run_khmer = False
+use_jellyfish = True
 
 
 def run(command, output=None):
@@ -56,8 +59,12 @@ if __name__ == '__main__':
                 params2['infile_base'] = params2['infile_base_ef']
                 for p in [params, params2]:
                     if compute_hist:
-                        run(khmer_hash.format(**p))
-                        run(khmer_hist.format(**p))
+                        if use_jellyfish:
+                            run(jellyfish_count.format(**p))
+                            run(jellyfish_hist.format(**p))
+                        else:
+                            run(khmer_count.format(**p))
+                            run(khmer_hist.format(**p))
                     run(estimator.format(**p),
                         '{infile_base}_k{k}.est.out'.format(**p))
                     if run_khmer:
