@@ -155,6 +155,8 @@ def main(args):
                 table_lines[key]['estimated_coverage'] = d.get('estimated_coverage', None)
                 table_lines[key]['estimated_error_rate'] = d.get('estimated_error_rate', None)
                 table_lines[key]['estimated_loglikelihood'] = d.get('estimated_loglikelihood', None)
+                table_lines[key]['estimated_q1'] = d.get('estimated_q1', None)
+                table_lines[key]['estimated_q'] = d.get('estimated_q', None)
                 table_lines[key]['guessed_coverage'] = d.get('guessed_coverage', None)
                 table_lines[key]['guessed_error_rate'] = d.get('guessed_error_rate', None)
                 table_lines[key]['guessed_loglikelihood'] = d.get('guessed_loglikelihood', None)
@@ -165,14 +167,22 @@ def main(args):
             else:
                 table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
 
+    # header = [
+    #     'original_coverage', 'original_error_rate', 'original_k',
+    #     'estimated_coverage', 'estimated_error_rate',
+    #     'estimated_ef_coverage',
+    #     'guessed_coverage', 'guessed_error_rate', 'guessed_ef_coverage',
+    #     'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
+    #     'khmer_coverage',
+    #     'khmer_ef_coverage',
+    # ]
+
     header = [
-        'original_coverage', 'original_error_rate', 'original_k',
+        'original_coverage', 'original_k',
         'estimated_coverage', 'estimated_error_rate',
-        'estimated_ef_coverage',
-        'guessed_coverage', 'guessed_error_rate', 'guessed_ef_coverage',
-        'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
-        'khmer_coverage',
-        'khmer_ef_coverage',
+        'estimated_q1', 'estimated_q',
+        'guessed_coverage', 'guessed_error_rate',
+        'estimated_loglikelihood', 'guessed_loglikelihood',
     ]
 
     print(format_table_html(
