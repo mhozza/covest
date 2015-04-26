@@ -8,6 +8,7 @@ import argparse
 from inverse import inverse
 import matplotlib.pyplot as plt
 import numpy
+from perf import running_time_decorator
 # from utils import print_wrap as pw
 
 
@@ -130,6 +131,7 @@ def compute_probabilities(r, k, c, err):
     return p_j
 
 
+@running_time_decorator
 def compute_loglikelihood(hist, r, k, c, err):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
@@ -156,6 +158,7 @@ def compute_probabilities_with_repeats(r, k, c, err, q1, q):
     return p_j
 
 
+@running_time_decorator
 def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
@@ -163,6 +166,7 @@ def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
     return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j])
 
 
+@running_time_decorator
 def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
                      error_rate=None, orig_coverage=None):
     likelihood_f = lambda x: -compute_loglikelihood(
@@ -192,6 +196,7 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
     return cov, e
 
 
+@running_time_decorator
 def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
                              guessed_q1=0.5, guessed_q=0.5,
                              error_rate=None, orig_coverage=None):
@@ -266,6 +271,7 @@ def plot_probs(r, k, hist, est_c, est_e, guess_c, guess_e, orig_c=None, orig_e=N
     plt.show()
 
 
+@running_time_decorator
 def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
     def generate_grid(args, step, max_depth):
         def generate_grid_single(var):
@@ -308,6 +314,7 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
     return min_args
 
 
+@running_time_decorator
 def main(args):
     orig_error_rate = args.error_rate if 'error_rate' in args else None
     orig_coverage = args.coverage if 'coverage' in args else None
