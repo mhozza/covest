@@ -26,6 +26,7 @@ coverages = [0.5, 1, 2, 4, 10, 30]
 ks = [21]
 
 generate = False
+generate_dist = generate
 use_jellyfish = True
 ef = False
 run_khmer = False
@@ -69,15 +70,16 @@ if __name__ == '__main__':
                 params2['infile_base'] = params2['infile_base_ef']
                 pp.append(params2)
             for p in pp:
-                if use_jellyfish:
-                    run(jellyfish_count.format(**p))
-                    run(jellyfish_hist.format(**p))
-                else:
-                    run(khmer_count.format(**p))
-                    run(khmer_hist.format(**p))
-                    if run_khmer:
-                        run(khmer_cov.format(**p),
-                            '{infile_base}_k{k}.khmer.out'.format(**p))
+                if generate_dist:
+                    if use_jellyfish:
+                        run(jellyfish_count.format(**p))
+                        run(jellyfish_hist.format(**p))
+                    else:
+                        run(khmer_count.format(**p))
+                        run(khmer_hist.format(**p))
+                        if run_khmer:
+                            run(khmer_cov.format(**p),
+                                '{infile_base}_k{k}.khmer.out'.format(**p))
                 if run_norep:
                     run(estimator.format(**p),
                         '{infile_base}_k{k}.est.out'.format(**p))
