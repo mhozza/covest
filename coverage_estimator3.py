@@ -10,6 +10,7 @@ from inverse import inverse
 import matplotlib.pyplot as plt
 import numpy
 from perf import running_time_decorator
+from functools32 import lru_cache
 # from utils import print_wrap as pw
 
 # defaults
@@ -42,26 +43,7 @@ def estimate_p(cc, alpha):
     return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
 
 
-def hist_trim(hist):
-    z = 0
-    last = -1
-    trim = len(hist)
-    for i, v in enumerate(hist):
-        if v == 0:
-            z += 1
-        else:
-            if last == 0:
-                if i > 100 and z > len(hist) // 10:
-                    trim = i - z
-                    break
-            z = 0
-        last = v
-    if len(hist) > trim:
-        verbose_print('Histogram trimmed to: {}'.format(trim))
-    return hist[:trim]
-
-
-def load_dist(fname):
+def load_dist(fname, trim=None, use_dict=False):
     unique_kmers = 0
     all_kmers = 0.0
     observed_ones = 0
@@ -82,8 +64,8 @@ def load_dist(fname):
                 all_kmers += i * cnt
 
     hist_l = [hist[b] for b in range(max_hist)]
-    if TRIM_HIST:
-        hist_l = hist_trim(hist_l)
+    if trim is not None:
+        hist_l = hist_l[:trim]
     return all_kmers, unique_kmers, observed_ones, hist_l
 
 
@@ -157,24 +139,21 @@ def compute_loglikelihood(hist, r, k, c, err):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities(r, k, c, err)
-    return fsum(
+    return float(fsum(
         hist[j] * safe_log(p_j(j))
         for j in range(1, len(hist))
         if hist[j]
-    )
+    ))
 
 
 def compute_probabilities_with_repeats(r, k, c, err, q1, q):
-    p_oj_d = dict()
-
+    @lru_cache(maxsize=None)
     def p_oj(o, j):
-        if (o, j) not in p_oj_d:
-            if o == 1:
-                res = compute_probabilities(r, k, c, err)(j)
-            else:
-                res = fsum(p_oj(1, i) * p_oj(o - 1, j - i) for i in range(1, j + 1))
-            p_oj_d[(o, j)] = res
-        return p_oj_d[(o, j)]
+        if o == 1:
+            res = compute_probabilities(r, k, c, err)(j)
+        else:
+            res = fsum(p_oj(1, i) * p_oj(o - 1, j - i) for i in range(1, j + 1))
+        return res
 
     b_o = lambda o: q1 if o == 1 else (1 - q1) * q * (1 - q) ** (o - 2)
     p_j = lambda j: fsum(
@@ -187,7 +166,7 @@ def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q)
-    return fsum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j])
+    return float(fsum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j]))
 
 
 @running_time_decorator
@@ -343,7 +322,7 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
 def main(args):
     orig_error_rate = args.error_rate if 'error_rate' in args else None
     orig_coverage = args.coverage if 'coverage' in args else None
-    all_kmers, unique_kmers, observed_ones, hist = load_dist(args.input_histogram)
+    all_kmers, unique_kmers, observed_ones, hist = load_dist(args.input_histogram, trim=args.trim)
     if args.ll_only:
         ll = compute_loglikelihood(
             hist, args.read_length, args.kmer_size, orig_coverage, orig_error_rate,
@@ -385,6 +364,7 @@ if __name__ == '__main__':
     parser.add_argument('--plot', action='store_true', help='Plot probabilities')
     parser.add_argument('--repeats', action='store_true', help='Estimate vith repeats')
     parser.add_argument('--ll-only', action='store_true', help='Only compute log likelihood')
+    parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
 
     args = parser.parse_args()
     main(args)

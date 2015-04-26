@@ -10,4 +10,5 @@ scipy==0.14.1
 six==1.9.0
 biopython==1.65
 bigfloat==0.3.0
+functools32==3.2.3.post1
 -e git+https://github.com/ged-lab/khmer@b3f5379757208481db705c0cba41a66d7af691fc#egg=khmer-origin/HEAD
