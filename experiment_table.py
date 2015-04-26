@@ -45,6 +45,7 @@ def parse_estimate(fname):
     orig_l = "'Original loglikelihood:'"
     guessed_l = "'Guessed loglikelihood:'"
     est_l = "'Estimated loglikelihood:'"
+    est_q = 'Estimated q1 and q:'
     # ', 3.1537225216529357, 4.44186270655343)
     coverage = None
     error = None
@@ -53,6 +54,7 @@ def parse_estimate(fname):
     orig_likelihood = None
     guessed_likelihood = None
     est_likelihood = None
+    d = dict()
     with open(fname) as f:
         for i, line in enumerate(f):
             line = line[1:len(line) - 2]
@@ -75,9 +77,18 @@ def parse_estimate(fname):
                 guessed_likelihood = float(parts[1])
             if parts[0] == est_l:
                 est_likelihood = float(parts[1])
+            if parts[0] == est_q:
+                d['estimated_q1'] = float(parts[1])
+                d['estimated_q'] = float(parts[2])
 
-    return coverage, error, guessed_c, guessed_e,\
-        orig_likelihood, guessed_likelihood, est_likelihood
+    d['estimated_coverage'] = coverage
+    d['estimated_error_rate'] = error
+    d['estimated_loglikelihood'] = est_likelihood
+    d['guessed_coverage'] = guessed_c
+    d['guessed_error_rate'] = guessed_e
+    d['guessed_loglikelihood'] = guessed_likelihood
+    d['original_loglikelihood'] = orig_likelihood
+    return d
 
 
 def parse_estimate2(fname):
@@ -137,21 +148,24 @@ def main(args):
 
     for fname in files:
         cov, error, k, ext, ef = parse_fname(fname, error)
+        repeats = ext[-1] == 'r'
 
-        key = (cov, error, k)
+        key = (cov, error, k, repeats)
 
         table_lines[key]['original_coverage'] = cov
         table_lines[key]['original_error_rate'] = error
         table_lines[key]['original_k'] = k
+        table_lines[key]['repeats'] = repeats
 
-        if ext == '.est':
-            d = parse_estimate2(fname)
+        if ext == '.est' or ext == '.est_r':
+            if args.legacy:
+                d = parse_estimate(fname)
+            else:
+                d = parse_estimate2(fname)
             if ef:
-                # est_cov_ef, _, g_cov_ef, _, _, _, _ = parse_estimate(fname)
                 table_lines[key]['estimated_ef_coverage'] = d.get('estimated_coverage', None)
                 table_lines[key]['guessed_ef_coverage'] = d.get('guessed_coverage', None)
             else:
-                # est_cov, est_err, g_cov, g_err, ol, gl, el = parse_estimate(fname)
                 table_lines[key]['estimated_coverage'] = d.get('estimated_coverage', None)
                 table_lines[key]['estimated_error_rate'] = d.get('estimated_error_rate', None)
                 table_lines[key]['estimated_loglikelihood'] = d.get('estimated_loglikelihood', None)
@@ -178,7 +192,7 @@ def main(args):
     # ]
 
     header = [
-        'original_coverage', 'original_k',
+        'original_coverage', 'original_k', 'repeats',
         'estimated_coverage', 'estimated_error_rate',
         'estimated_q1', 'estimated_q',
         'guessed_coverage', 'guessed_error_rate',
@@ -199,5 +213,6 @@ if __name__ == '__main__':
     parser.add_argument('path', help='Experiment')
     parser.add_argument('-f', '--format', default='html', help='Table format')
     parser.add_argument('--no-error', action='store_true', help='Error is unknown')
+    parser.add_argument('--legacy', action='store_true', help='Run in legacy mode')
     args = parser.parse_args()
     main(args)
