@@ -56,6 +56,8 @@ def hist_trim(hist):
                     break
             z = 0
         last = v
+    if len(hist) > trim:
+        verbose_print('Histogram trimmed to: {}'.format(trim))
     return hist[:trim]
 
 
@@ -348,7 +350,7 @@ def main(args):
         )
         print('Loglikelihood:', ll)
     else:
-        verbose_print('Estimating coverage')
+        verbose_print('Estimating coverage for {}'.format(args.input_histogram))
         cov, e = compute_coverage_apx(
             all_kmers, unique_kmers, observed_ones,
             args.kmer_size, args.read_length
