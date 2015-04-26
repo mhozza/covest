@@ -153,7 +153,7 @@ def compute_probabilities_with_repeats(r, k, c, err, q1, q):
         if o == 1:
             res = compute_probabilities(r, k, c, err)(j)
         else:
-            res = fsum(p_oj(1, i) * p_oj(o - 1, j - i) for i in range(1, j + 1))
+            res = fsum(p_oj(1, i) * p_oj(o - 1, j - i) for i in range(1, j))
         return res
 
     b_o = lambda o: q1 if o == 1 else (1 - q1) * q * (1 - q) ** (o - 2)
