@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 import sys
-from math import exp, log, fsum
+from math import fsum
 import itertools
 from collections import defaultdict
 from scipy.misc import comb, factorial
@@ -33,6 +33,7 @@ def verbose_print(message):
 try:
     from bigfloat import BigFloat, exp, log
 except ImportError:
+    from math import exp, log
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
     BigFloat = lambda x: float(x)
 
@@ -347,10 +348,12 @@ def main(args):
         )
         print('Loglikelihood:', ll)
     else:
+        verbose_print('Estimating coverage')
         cov, e = compute_coverage_apx(
             all_kmers, unique_kmers, observed_ones,
             args.kmer_size, args.read_length
         )
+        verbose_print('Initial guess: c: {} e: {}'.format(cov, e))
 
         # We were unable to guess cov and e, try to estimate from some fixed valid data instead
         if cov == 0 and e == 1:
