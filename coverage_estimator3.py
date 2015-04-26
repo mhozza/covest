@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy
 from perf import running_time_decorator
 from functools32 import lru_cache
+import json
 # from utils import print_wrap as pw
 
 # defaults
@@ -93,9 +94,9 @@ def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
     if estimated_p > 0:
         # function for conversion between kmer and base coverage
         kmer_to_read_coverage = lambda c: c * r / (r - k + 1)
-        return kmer_to_read_coverage(cov / estimated_p), e
+        return float(kmer_to_read_coverage(cov / estimated_p)), float(e)
     else:
-        return 0, e
+        return 0.0, float(e)
 
 
 def tr_poisson(l, j):
@@ -171,7 +172,8 @@ def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
 
 @running_time_decorator
 def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
-                     error_rate=None, orig_coverage=None):
+                     error_rate=None, orig_coverage=None,
+                     use_grid=False):
     likelihood_f = lambda x: -compute_loglikelihood(
         hist, args.read_length, args.kmer_size, x[0], x[1]
     )
@@ -181,20 +183,27 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
         bounds=((0.0, None), (0.0, 1.0)),
         options={'disp': False}
     )
-    # res = minimize(likelihood_f, x0, options={'disp': True})
-    cov, e = minimize_grid(likelihood_f, res.x, bounds=((0.0, None), (0.0, 1.0)))
+    cov, e = res.x
+    if use_grid:
+        cov, e = minimize_grid(likelihood_f, res.x, bounds=((0.0, None), (0.0, 1.0)))
 
-    print('Guessed coverage:', guessed_c)
-    print('Final coverage:', cov)
+    output_data = {
+        'guessed_coverage': guessed_c,
+        'guessed_error_rate': guessed_e,
+        'guessed_loglikelihood': -likelihood_f(x0),
+        'estimated_error_rate': e,
+        'estimated_coverage': cov,
+        'estimated_loglikelihood': -likelihood_f([cov, e]),
+    }
+
     if error_rate is not None:
-        print('Given error rate:', error_rate)
-    print('Guessed error rate:', guessed_e)
-    print('Final error rate:', e)
+        output_data['original_error_rate'] = error_rate,
 
     if error_rate is not None and orig_coverage is not None:
-        print('Original loglikelihood:', -likelihood_f([orig_coverage, error_rate]))
-    print('Guessed loglikelihood:', -likelihood_f(x0))
-    print('Estimated loglikelihood:', -likelihood_f([cov, e]))
+        output_data['original_loglikelihood'] = -likelihood_f([orig_coverage, error_rate]),
+
+    print json.dumps(output_data, sort_keys=True,
+                     indent=4, separators=(',', ': '))
 
     return cov, e
 
@@ -202,7 +211,8 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
 @running_time_decorator
 def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
                              guessed_q1=0.5, guessed_q=0.5,
-                             error_rate=None, orig_coverage=None):
+                             error_rate=None, orig_coverage=None,
+                             use_grid=False):
 
     likelihood_f = lambda x: -compute_loglikelihood_with_repeats(
         hist, args.read_length, args.kmer_size, x[0], x[1], x[2], x[3],
@@ -214,26 +224,32 @@ def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
         bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
         options={'disp': False}
     )
-    # res = minimize(likelihood_f, x0, options={'disp': False})
     cov, e, q1, q = res.x
-    # cov, e, q1, q = minimize_grid(
-    #     likelihood_f, res.x,
-    #     bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
-    # )
+    if use_grid:
+        cov, e, q1, q = minimize_grid(
+            likelihood_f, res.x,
+            bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+        )
 
-    print('Guessed coverage:', guessed_c)
-    print('Final coverage:', cov)
+    output_data = {
+        'guessed_coverage': guessed_c,
+        'guessed_error_rate': guessed_e,
+        'guessed_loglikelihood': -likelihood_f(x0),
+        'estimated_error_rate': e,
+        'estimated_coverage': cov,
+        'estimated_loglikelihood': -likelihood_f([cov, e, q1, q]),
+        'estimated_q1': q1,
+        'estimated_q': q,
+    }
+
     if error_rate is not None:
-        print('Given error rate:', error_rate)
-    print('Guessed error rate:', guessed_e)
-    print('Final error rate:', e)
+        output_data['original_error_rate'] = error_rate,
 
     if error_rate is not None and orig_coverage is not None:
-        print('Original loglikelihood:', -likelihood_f([orig_coverage, error_rate, q1, q]))
-    print('Guessed loglikelihood:', -likelihood_f(x0))
-    print('Estimated loglikelihood:', -likelihood_f([cov, e, q1, q]))
+        output_data['original_loglikelihood'] = -likelihood_f([orig_coverage, error_rate, q1, q]),
 
-    print('Estimated q1 and q:', q1, q)
+    print json.dumps(output_data, sort_keys=True,
+                     indent=4, separators=(',', ': '))
 
     return cov, e
 
@@ -345,6 +361,7 @@ def main(args):
         cov2, e2 = cov_est(
             hist, args.read_length, args.kmer_size, cov, e,
             error_rate=orig_error_rate, orig_coverage=orig_coverage,
+            use_grid=args.grid
         )
         if args.plot:
             plot_probs(
@@ -365,6 +382,8 @@ if __name__ == '__main__':
     parser.add_argument('--repeats', action='store_true', help='Estimate vith repeats')
     parser.add_argument('--ll-only', action='store_true', help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
+    parser.add_argument('-g', '--grid', action='store_true', default=False,
+                        help='Use grid search')
 
     args = parser.parse_args()
     main(args)
