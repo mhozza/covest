@@ -160,7 +160,7 @@ def compute_loglikelihood(hist, r, k, c, err):
     return fsum(
         hist[j] * safe_log(p_j(j))
         for j in range(1, len(hist))
-        if hist[j] and p_j(j) > 0
+        if hist[j]
     )
 
 
