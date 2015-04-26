@@ -2,6 +2,7 @@
 import argparse
 import glob
 import os
+import json
 from collections import defaultdict
 
 
@@ -79,6 +80,10 @@ def parse_estimate(fname):
         orig_likelihood, guessed_likelihood, est_likelihood
 
 
+def parse_estimate2(fname):
+    return json.load(fname)
+
+
 def format_table(header, lines, template, line_template, header_cell_template,
                  cell_template, round_floats=4):
     lbody = ''
@@ -140,19 +145,20 @@ def main(args):
         table_lines[key]['original_k'] = k
 
         if ext == '.est':
+            d = parse_estimate2(fname)
             if ef:
-                est_cov_ef, _, g_cov_ef, _, _, _, _ = parse_estimate(fname)
-                table_lines[key]['estimated_ef_coverage'] = est_cov_ef
-                table_lines[key]['guessed_ef_coverage'] = g_cov_ef
+                # est_cov_ef, _, g_cov_ef, _, _, _, _ = parse_estimate(fname)
+                table_lines[key]['estimated_ef_coverage'] = d.get('estimated_coverage', None)
+                table_lines[key]['guessed_ef_coverage'] = d.get('guessed_coverage', None)
             else:
-                est_cov, est_err, g_cov, g_err, ol, gl, el = parse_estimate(fname)
-                table_lines[key]['estimated_coverage'] = est_cov
-                table_lines[key]['estimated_error_rate'] = est_err
-                table_lines[key]['guessed_coverage'] = g_cov
-                table_lines[key]['guessed_error_rate'] = g_err
-                table_lines[key]['original_loglikelihood'] = ol
-                table_lines[key]['estimated_loglikelihood'] = el
-                table_lines[key]['guessed_loglikelihood'] = gl
+                # est_cov, est_err, g_cov, g_err, ol, gl, el = parse_estimate(fname)
+                table_lines[key]['estimated_coverage'] = d.get('estimated_coverage', None)
+                table_lines[key]['estimated_error_rate'] = d.get('estimated_error_rate', None)
+                table_lines[key]['estimated_loglikelihood'] = d.get('estimated_loglikelihood', None)
+                table_lines[key]['guessed_coverage'] = d.get('guessed_coverage', None)
+                table_lines[key]['guessed_error_rate'] = d.get('guessed_error_rate', None)
+                table_lines[key]['guessed_loglikelihood'] = d.get('guessed_loglikelihood', None)
+                table_lines[key]['original_loglikelihood'] = d.get('original_loglikelihood', None)
         else:
             if ef:
                 table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
