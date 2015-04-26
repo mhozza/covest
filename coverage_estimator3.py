@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+import sys
 from math import exp, log, fsum
 import itertools
 from collections import defaultdict
@@ -11,14 +12,29 @@ import numpy
 from perf import running_time_decorator
 # from utils import print_wrap as pw
 
-
+# defaults
 DEFAULT_K = 20
 DEFAULT_READ_LENGTH = 100
 ERROR_RATE = 0.03
 
+# config
+TRIM_HIST = True
+VERBOSE = True
 # INF = 1e100
 INF = float('inf')
-trim_hist = True
+
+
+def verbose_print(message):
+    if not VERBOSE:
+        return
+    sys.stderr.write(message + "\n")
+
+
+try:
+    from bigfloat import BigFloat, exp, log
+except ImportError:
+    verbose_print('BigFloats are not used!\nPrecision issues may occur.')
+    BigFloat = lambda x: float(x)
 
 
 def estimate_p(cc, alpha):
@@ -62,8 +78,8 @@ def load_dist(fname):
                 unique_kmers += cnt
                 all_kmers += i * cnt
 
-    hist_l = [hist[i] for i in range(max_hist)]
-    if trim_hist:
+    hist_l = [hist[b] for b in range(max_hist)]
+    if TRIM_HIST:
         hist_l = hist_trim(hist_l)
     return all_kmers, unique_kmers, observed_ones, hist_l
 
@@ -102,13 +118,16 @@ def tr_poisson(l, j):
         try:
             if exp(l) == 1.0:  # precision fix
                 return 0.0
-            return min(1.0, (l ** j) / (factorial(j) * (exp(l) - 1.0)))
+            p1 = BigFloat(l ** j)
+            p2 = BigFloat(factorial(j, exact=True))
+            p3 = BigFloat(exp(l) - 1.0)
+            return p1 / (p2 * p3)
         except (OverflowError, FloatingPointError):
             return 0.0
 
 
 def safe_log(x):
-    if x == 0:
+    if x <= 0:
         return -INF
     return log(x)
 
@@ -131,12 +150,15 @@ def compute_probabilities(r, k, c, err):
     return p_j
 
 
-@running_time_decorator
 def compute_loglikelihood(hist, r, k, c, err):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities(r, k, c, err)
-    return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j])
+    return fsum(
+        hist[j] * safe_log(p_j(j))
+        for j in range(1, len(hist))
+        if hist[j] and p_j(j) > 0
+    )
 
 
 def compute_probabilities_with_repeats(r, k, c, err, q1, q):
@@ -158,12 +180,11 @@ def compute_probabilities_with_repeats(r, k, c, err, q1, q):
     return p_j
 
 
-@running_time_decorator
 def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q)
-    return sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j])
+    return fsum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j])
 
 
 @running_time_decorator
@@ -176,7 +197,7 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
     res = minimize(
         likelihood_f, x0,
         bounds=((0.0, None), (0.0, 1.0)),
-        options={'disp': True}
+        options={'disp': False}
     )
     # res = minimize(likelihood_f, x0, options={'disp': True})
     cov, e = minimize_grid(likelihood_f, res.x, bounds=((0.0, None), (0.0, 1.0)))
@@ -212,11 +233,11 @@ def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
         options={'disp': False}
     )
     # res = minimize(likelihood_f, x0, options={'disp': False})
-    # cov, e, q1, q = res.x
-    cov, e, q1, q = minimize_grid(
-        likelihood_f, res.x,
-        bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
-    )
+    cov, e, q1, q = res.x
+    # cov, e, q1, q = minimize_grid(
+    #     likelihood_f, res.x,
+    #     bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+    # )
 
     print('Guessed coverage:', guessed_c)
     print('Final coverage:', cov)
@@ -281,7 +302,7 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
             )
 
         def filter_bounds(var_grid, i):
-            if bounds is None or len(bounds) >= i or len(bounds[1]) != 2:
+            if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
                 return var_grid
             low, high = bounds[i]
             return (
@@ -298,9 +319,10 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
     min_val = fn(initial_guess)
     min_args = initial_guess
     step = 1.1
-    grid_depth = 3
+    grid_depth = 2
     diff = 1
     while (diff > 0.1 or step > 1.001):
+        print diff, step
         diff = 0
         for args in generate_grid(min_args, step, grid_depth):
             val = fn(args)
@@ -319,26 +341,32 @@ def main(args):
     orig_error_rate = args.error_rate if 'error_rate' in args else None
     orig_coverage = args.coverage if 'coverage' in args else None
     all_kmers, unique_kmers, observed_ones, hist = load_dist(args.input_histogram)
-    cov, e = compute_coverage_apx(
-        all_kmers, unique_kmers, observed_ones,
-        args.kmer_size, args.read_length
-    )
-
-    # We were unable to guess cov and e, try to estimate from some fixed valid data instead
-    if cov == 0 and e == 1:
-        cov = 1
-        e = 0.5
-
-    cov_est = compute_coverage_repeats if args.repeats else compute_coverage
-    cov2, e2 = cov_est(
-        hist, args.read_length, args.kmer_size, cov, e,
-        error_rate=orig_error_rate, orig_coverage=orig_coverage,
-    )
-    if args.plot:
-        plot_probs(
-            args.read_length, args.kmer_size, hist,
-            cov2, e2, cov, e, orig_coverage, orig_error_rate,
+    if args.ll_only:
+        ll = compute_loglikelihood(
+            hist, args.read_length, args.kmer_size, orig_coverage, orig_error_rate,
         )
+        print('Loglikelihood:', ll)
+    else:
+        cov, e = compute_coverage_apx(
+            all_kmers, unique_kmers, observed_ones,
+            args.kmer_size, args.read_length
+        )
+
+        # We were unable to guess cov and e, try to estimate from some fixed valid data instead
+        if cov == 0 and e == 1:
+            cov = 1
+            e = 0.5
+
+        cov_est = compute_coverage_repeats if args.repeats else compute_coverage
+        cov2, e2 = cov_est(
+            hist, args.read_length, args.kmer_size, cov, e,
+            error_rate=orig_error_rate, orig_coverage=orig_coverage,
+        )
+        if args.plot:
+            plot_probs(
+                args.read_length, args.kmer_size, hist,
+                cov2, e2, cov, e, orig_coverage, orig_error_rate,
+            )
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
@@ -351,6 +379,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('--plot', action='store_true', help='Plot probabilities')
     parser.add_argument('--repeats', action='store_true', help='Estimate vith repeats')
+    parser.add_argument('--ll-only', action='store_true', help='Only compute log likelihood')
 
     args = parser.parse_args()
     main(args)
