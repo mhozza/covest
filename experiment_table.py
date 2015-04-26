@@ -45,7 +45,7 @@ def parse_estimate(fname):
     orig_l = "'Original loglikelihood:'"
     guessed_l = "'Guessed loglikelihood:'"
     est_l = "'Estimated loglikelihood:'"
-    est_q = 'Estimated q1 and q:'
+    est_q = "'Estimated q1 and q:'"
     # ', 3.1537225216529357, 4.44186270655343)
     coverage = None
     error = None
@@ -68,9 +68,9 @@ def parse_estimate(fname):
             if parts[0] == cov2:
                 coverage = float(parts[1])
             if parts[0] == gcov:
-                guessed_c = float(parts[1])
+                guessed_c = float(parts[1].strip(" '\""))
             if parts[0] == gerr:
-                guessed_e = float(parts[1])
+                guessed_e = float(parts[1].strip(" '\""))
             if parts[0] == orig_l:
                 orig_likelihood = float(parts[1])
             if parts[0] == guessed_l:
@@ -92,7 +92,8 @@ def parse_estimate(fname):
 
 
 def parse_estimate2(fname):
-    return json.load(fname)
+    with open(fname, 'rU') as f:
+        return json.load(f)
 
 
 def format_table(header, lines, template, line_template, header_cell_template,
@@ -203,7 +204,7 @@ def main(args):
         header,
         sorted(
             list(table_lines.values()),
-            key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'])
+            key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
         )
     ))
 
@@ -212,7 +213,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Parse experiment output and generate table')
     parser.add_argument('path', help='Experiment')
     parser.add_argument('-f', '--format', default='html', help='Table format')
-    parser.add_argument('--no-error', action='store_true', help='Error is unknown')
+    parser.add_argument('-ne', '--no-error', action='store_true', help='Error is unknown')
     parser.add_argument('--legacy', action='store_true', help='Run in legacy mode')
     args = parser.parse_args()
     main(args)
