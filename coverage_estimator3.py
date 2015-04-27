@@ -80,6 +80,7 @@ def load_dist(fname, autotrim=False, trim=None):
     hist_l = [hist[b] for b in range(max_hist)]
     if autotrim:
         trim = get_trim(hist_l, trim)
+        verbose_print('Trimming at: {}'.format(trim))
         hist_l = hist_l[:trim]
     elif trim is not None:
         hist_l = hist_l[:trim]
