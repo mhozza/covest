@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 import sys
 import itertools
 from collections import defaultdict
@@ -9,8 +9,9 @@ from inverse import inverse
 import matplotlib.pyplot as plt
 import numpy
 from perf import running_time_decorator
-from functools32 import lru_cache
+from functools import lru_cache
 import json
+import random
 # from utils import print_wrap as pw
 
 # defaults
@@ -19,7 +20,6 @@ DEFAULT_READ_LENGTH = 100
 ERROR_RATE = 0.03
 
 # config
-TRIM_HIST = True
 VERBOSE = True
 # INF = 1e100
 INF = float('inf')
@@ -79,7 +79,7 @@ def load_dist(fname, autotrim=False, trim=None):
 
     hist_l = [hist[b] for b in range(max_hist)]
     if autotrim:
-        trim = get_trim(hist_l, trim)
+        trim = get_trim(hist_l, autotrim)
         verbose_print('Trimming at: {}'.format(trim))
         hist_l = hist_l[:trim]
     elif trim is not None:
@@ -123,7 +123,10 @@ def tr_poisson(l, j):
                 return 0.0
             p1 = BigFloat(pow(l, j))
             p2 = BigFloat(factorial(j, exact=True))
-            p3 = BigFloat(exp(l) - 1.0)
+            if l > 1e-8:
+                p3 = BigFloat(exp(l) - 1.0)
+            else:
+                p3 = BigFloat(l)
             res = p1 / (p2 * p3)
             return res
         except (OverflowError, FloatingPointError):
@@ -136,62 +139,101 @@ def safe_log(x):
     return log(x)
 
 
-def compute_probabilities(r, k, c, err):
+@lru_cache(maxsize=100)
+def compute_probabilities(r, k, c, err, max_hist):
     # read to kmer coverage
     c = c * (r - k + 1) / r
     # lambda for kmers with s errors
-    l_s = lambda s: c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s
+    l_s = [c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
     # expected probability of kmers with s errors and coverage >= 1
-    n_s = lambda s: comb(k, s) * (3 ** s) * (1.0 - exp(-l_s(s)))
-    sum_n_s = sum(n_s(t) for t in range(k + 1))
+    n_s = [comb(k, s) * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(k + 1)]
+    sum_n_s = sum(n_s[t] for t in range(k + 1))
 
     if sum_n_s == 0:  # division by zero fix
         sum_n_s = 1
     # portion of kmers with s errors
-    a_s = lambda s: n_s(s) / sum_n_s
+    a_s = [n_s[s] / sum_n_s for s in range(k + 1)]
     # probability that unique kmer has coverage j (j > 0)
-    p_j = lambda j: sum(a_s(s) * tr_poisson(l_s(s), j) for s in range(k + 1))
+
+    p_j = [None] + [
+        sum(a_s[s] * tr_poisson(l_s[s], j) for s in range(k + 1)) for j in range(1, max_hist)
+    ]
     return p_j
 
 
 def compute_loglikelihood(hist, r, k, c, err):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
-    p_j = compute_probabilities(r, k, c, err)
+    p_j = compute_probabilities(r, k, c, err, len(hist))
     return float(sum(
-        hist[j] * safe_log(p_j(j))
+        hist[j] * safe_log(p_j[j])
         for j in range(1, len(hist))
         if hist[j]
     ))
 
 
-def compute_probabilities_with_repeats(r, k, c, err, q1, q):
-    @lru_cache(maxsize=None)
-    def p_oj(o, j):
-        if o == 1:
-            res = compute_probabilities(r, k, c, err)(j)
-        else:
-            res = sum(p_oj(1, i) * p_oj(o - 1, j - i) for i in range(1, j))
-        return res
+@lru_cache(maxsize=100)
+def compute_repeat_table(r, k, c, err, hist_size, treshold_o=None):
+    p_j = compute_probabilities(r, k, c, err, hist_size)
+    p_oj = [
+        [None], [None] + [p_j[j] for j in range(1, hist_size)]
+    ]
 
-    b_o = lambda o: q1 if o == 1 else (1 - q1) * q * (1 - q) ** (o - 2)
+    if treshold_o is None:
+        treshold_o = hist_size
+
+    for o in range(2, treshold_o):
+        p = [[None]]
+        for j in range(1, hist_size):
+            res = 0.0
+            for i in range(1, j):
+                t = p_oj[1][i] * p_oj[o - 1][j - i]
+                res += t
+            p.append(res)
+        p_oj.append(p)
+
+    return p_oj
+
+
+def compute_probabilities_with_repeats(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
+    def b_o(o):
+        if o == 1:
+            return q1
+        elif o == 2:
+            return (1 - q1) * q2
+        else:
+            return (1 - q1) * (1 - q2) * q * (1 - q) ** (o - 3)
+
+    treshold_o = None
+    if treshold is not None:
+        for o in range(1, hist_size):
+            if b_o(o) < treshold:
+                treshold_o = o
+                break
+
+    p_oj = compute_repeat_table(r, k, c, err, hist_size, treshold_o)
+
     p_j = lambda j: sum(
-        b_o(o) * p_oj(o, j) for o in range(1, j + 1)
+        b_o(o) * p_oj[o][j]
+        for o in range(
+            1,
+            min(j + 1, treshold_o) if treshold_o is not None else j + 1
+        )
     )
     return p_j
 
 
-def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
+def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q2, q):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
-    p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q)
+    p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q2, q, len(hist))
     return float(sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j]))
 
 
 @running_time_decorator
 def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
                      error_rate=None, orig_coverage=None,
-                     use_grid=False):
+                     use_grid=False, use_hillclimb=False):
     likelihood_f = lambda x: -compute_loglikelihood(
         hist, args.read_length, args.kmer_size, x[0], x[1]
     )
@@ -199,11 +241,22 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
     res = minimize(
         likelihood_f, x0,
         bounds=((0.0, None), (0.0, 1.0)),
-        options={'disp': False}
+        options={'disp': True}
     )
     cov, e = res.x
+
+    if use_hillclimb:
+        verbose_print('Starting hillclimbing search with guess: {}'.format(res.x))
+        cov, e = minimize_hillclimbing(
+            likelihood_f, [cov, e],
+            bounds=((0.0, None), (0.0, 1.0)),
+        )
+
     if use_grid:
-        cov, e = minimize_grid(likelihood_f, res.x, bounds=((0.0, None), (0.0, 1.0)))
+        verbose_print('Starting grid search with guess: {}'.format(res.x))
+        cov, e = minimize_grid(
+            likelihood_f, [cov, e], bounds=((0.0, None), (0.0, 1.0))
+        )
 
     output_data = {
         'guessed_coverage': guessed_c,
@@ -215,38 +268,48 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
     }
 
     if error_rate is not None:
-        output_data['original_error_rate'] = error_rate,
+        output_data['original_error_rate'] = error_rate
 
     if error_rate is not None and orig_coverage is not None:
-        output_data['original_loglikelihood'] = -likelihood_f([orig_coverage, error_rate]),
+        output_data['original_loglikelihood'] = -likelihood_f([orig_coverage, error_rate])
 
-    print json.dumps(output_data, sort_keys=True,
-                     indent=4, separators=(',', ': '))
+    print(json.dumps(
+        output_data, sort_keys=True, indent=4, separators=(',', ': ')
+    ))
 
     return cov, e
 
 
 @running_time_decorator
 def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
-                             guessed_q1=0.5, guessed_q=0.5,
+                             guessed_q1=0.5, guessed_q2=0.5, guessed_q=0.5,
                              error_rate=None, orig_coverage=None,
-                             use_grid=False):
+                             use_grid=False, use_hillclimb=True):
 
     likelihood_f = lambda x: -compute_loglikelihood_with_repeats(
-        hist, args.read_length, args.kmer_size, x[0], x[1], x[2], x[3],
+        hist, args.read_length, args.kmer_size, x[0], x[1], x[2], x[3], x[4],
     )
-    x0 = [guessed_c, guessed_e, guessed_q1, guessed_q]
+    x0 = [guessed_c, guessed_e, guessed_q1, guessed_q2, guessed_q]
 
     res = minimize(
         likelihood_f, x0,
-        bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
-        options={'disp': False}
+        bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+        options={'disp': True}
     )
-    cov, e, q1, q = res.x
+    cov, e, q1, q2, q = res.x
+
+    if use_hillclimb:
+        verbose_print('Starting hillclimbing search with guess: {}'.format(res.x))
+        cov, e, q1, q2, q = minimize_hillclimbing(
+            likelihood_f, [cov, e, q1, q2, q],
+            bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+        )
+
     if use_grid:
-        cov, e, q1, q = minimize_grid(
-            likelihood_f, res.x,
-            bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+        verbose_print('Starting grid search with guess: {}'.format(res.x))
+        cov, e, q1, q2, q = minimize_grid(
+            likelihood_f, [cov, e, q1, q2, q],
+            bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
         )
 
     output_data = {
@@ -255,19 +318,23 @@ def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
         'guessed_loglikelihood': -likelihood_f(x0),
         'estimated_error_rate': e,
         'estimated_coverage': cov,
-        'estimated_loglikelihood': -likelihood_f([cov, e, q1, q]),
+        'estimated_loglikelihood': -likelihood_f([cov, e, q1, q2, q]),
         'estimated_q1': q1,
+        'estimated_q2': q2,
         'estimated_q': q,
     }
 
     if error_rate is not None:
-        output_data['original_error_rate'] = error_rate,
+        output_data['original_error_rate'] = error_rate
 
     if error_rate is not None and orig_coverage is not None:
-        output_data['original_loglikelihood'] = -likelihood_f([orig_coverage, error_rate, q1, q]),
+        output_data['original_loglikelihood'] = -likelihood_f(
+            [orig_coverage, error_rate, q1, q2, q]
+        )
 
-    print json.dumps(output_data, sort_keys=True,
-                     indent=4, separators=(',', ': '))
+    print(json.dumps(
+        output_data, sort_keys=True, indent=4, separators=(',', ': ')
+    ))
 
     return cov, e
 
@@ -335,20 +402,80 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
     min_val = fn(initial_guess)
     min_args = initial_guess
     step = 1.1
-    grid_depth = 2
+    grid_depth = 3
     diff = 1
-    while (diff > 0.1 or step > 1.001):
-        print diff, step
-        diff = 0
-        for args in generate_grid(min_args, step, grid_depth):
-            val = fn(args)
-            if val < min_val:
-                min_val = val
-                min_args = args
-                diff += min_val - val
-        if diff < 1:
-            step = 1 + (step - 1) * 0.9
+    n_iter = 0
+    verbose_print('Grid size: {}'.format(sum(
+        [1 for _ in generate_grid(min_args, step, grid_depth)]
+    )))
+    try:
+        while (diff > 0.1 or step > 1.001):
+            n_iter += 1
+            diff = 0.0
+            for args in generate_grid(min_args, step, grid_depth):
+                val = fn(args)
+                if val < min_val:
+                    diff += min_val - val
+                    min_val = val
+                    min_args = args
+            if diff < 1.0:
+                step = 1 + (step - 1) * 0.75
+            verbose_print('GS_{}: d:{} s:{}'.format(n_iter, diff, step))
+    except KeyboardInterrupt:
+        verbose_print('Grid search interrupted')
 
+    verbose_print('Number of iterations in grid search:{}'.format(n_iter))
+    return min_args
+
+
+@running_time_decorator
+def minimize_hillclimbing(fn, initial_guess, bounds=None, oprions=None, iterations=1000):
+    def generate_grid(args, step, max_depth):
+        def generate_grid_single(var):
+            return (
+                var * step ** d
+                for d in range(-max_depth, max_depth + 1) if d != 0
+            )
+
+        def filter_bounds(var_grid, i):
+            if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
+                return var_grid
+            low, high = bounds[i]
+            return (
+                var for var in var_grid
+                if (low is None or var >= low) and (high is None or var <= high)
+            )
+
+        r = random.randrange(len(args))
+        var_grids = [
+            list(filter_bounds(generate_grid_single(var), i)) if i == r else [args[i]]
+            for i, var in enumerate(args)
+        ]
+        return itertools.product(*var_grids)
+
+    min_val = fn(initial_guess)
+    min_args = initial_guess
+    step = 1.1
+    grid_depth = 3
+    n_iter = 0
+    verbose_print('Grid size: {}'.format(sum(
+        [1 for _ in generate_grid(min_args, step, grid_depth)]
+    )))
+    try:
+        while n_iter < iterations:
+            modified = False
+            n_iter += 1
+            for args in generate_grid(min_args, step, grid_depth):
+                val = fn(args)
+                if val < min_val:
+                    modified = True
+                    min_val = val
+                    min_args = args
+            verbose_print('HC_{} m:{}'.format(n_iter, modified))
+    except KeyboardInterrupt:
+        verbose_print('Hill climb search interrupted')
+
+    verbose_print('Number of iterations in grid search:{}'.format(n_iter))
     return min_args
 
 
@@ -356,9 +483,8 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
 def main(args):
     orig_error_rate = args.error_rate if 'error_rate' in args else None
     orig_coverage = args.coverage if 'coverage' in args else None
-    autotrim = 'autotrim' in args
     all_kmers, unique_kmers, observed_ones, hist = load_dist(
-        args.input_histogram, autotrim=autotrim, trim=args.autotrim if autotrim else args.trim
+        args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
     if args.ll_only:
         ll = compute_loglikelihood(
@@ -384,7 +510,7 @@ def main(args):
         cov2, e2 = cov_est(
             hist, args.read_length, args.kmer_size, cov, e,
             error_rate=orig_error_rate, orig_coverage=orig_coverage,
-            use_grid=args.grid
+            use_grid=args.grid, use_hillclimb=args.hillclimbing,
         )
         if args.plot:
             plot_probs(
@@ -406,10 +532,12 @@ if __name__ == '__main__':
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
-    parser.add_argument('-at', '--autotrim', type=int, nargs='?', default=True,
+    parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=False,
                         help='Trim histogram at this value')
     parser.add_argument('-g', '--grid', action='store_true', default=False,
                         help='Use grid search')
+    parser.add_argument('-hc', '--hillclimbing', action='store_true', default=False,
+                        help='Use hill climbing')
 
     args = parser.parse_args()
     main(args)
