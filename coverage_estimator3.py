@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 import sys
-from math import fsum
 import itertools
 from collections import defaultdict
 from scipy.misc import comb, factorial
@@ -33,9 +32,9 @@ def verbose_print(message):
 
 
 try:
-    from bigfloat import BigFloat, exp, log
+    from bigfloat import BigFloat, exp, log, pow
 except ImportError:
-    from math import exp, log
+    from math import exp, log, pow
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
     BigFloat = lambda x: float(x)
 
@@ -44,7 +43,21 @@ def estimate_p(cc, alpha):
     return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
 
 
-def load_dist(fname, trim=None, use_dict=False):
+def get_trim(hist, precision=None):
+    ss = float(sum(hist))
+    s = 0.0
+    trim = None
+    for i, h in enumerate(hist):
+        s += h
+        r = s / ss
+        if precision:
+            r = round(r, precision)
+        if r == 1 and trim is None:
+            trim = i
+    return trim
+
+
+def load_dist(fname, autotrim=False, trim=None):
     unique_kmers = 0
     all_kmers = 0.0
     observed_ones = 0
@@ -65,7 +78,10 @@ def load_dist(fname, trim=None, use_dict=False):
                 all_kmers += i * cnt
 
     hist_l = [hist[b] for b in range(max_hist)]
-    if trim is not None:
+    if autotrim:
+        trim = get_trim(hist_l, trim)
+        hist_l = hist_l[:trim]
+    elif trim is not None:
         hist_l = hist_l[:trim]
     return all_kmers, unique_kmers, observed_ones, hist_l
 
@@ -104,10 +120,11 @@ def tr_poisson(l, j):
         try:
             if exp(l) == 1.0:  # precision fix
                 return 0.0
-            p1 = BigFloat(l ** j)
+            p1 = BigFloat(pow(l, j))
             p2 = BigFloat(factorial(j, exact=True))
             p3 = BigFloat(exp(l) - 1.0)
-            return p1 / (p2 * p3)
+            res = p1 / (p2 * p3)
+            return res
         except (OverflowError, FloatingPointError):
             return 0.0
 
@@ -125,14 +142,14 @@ def compute_probabilities(r, k, c, err):
     l_s = lambda s: c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s
     # expected probability of kmers with s errors and coverage >= 1
     n_s = lambda s: comb(k, s) * (3 ** s) * (1.0 - exp(-l_s(s)))
-    sum_n_s = fsum(n_s(t) for t in range(k + 1))
+    sum_n_s = sum(n_s(t) for t in range(k + 1))
 
     if sum_n_s == 0:  # division by zero fix
         sum_n_s = 1
     # portion of kmers with s errors
     a_s = lambda s: n_s(s) / sum_n_s
     # probability that unique kmer has coverage j (j > 0)
-    p_j = lambda j: fsum(a_s(s) * tr_poisson(l_s(s), j) for s in range(k + 1))
+    p_j = lambda j: sum(a_s(s) * tr_poisson(l_s(s), j) for s in range(k + 1))
     return p_j
 
 
@@ -140,7 +157,7 @@ def compute_loglikelihood(hist, r, k, c, err):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities(r, k, c, err)
-    return float(fsum(
+    return float(sum(
         hist[j] * safe_log(p_j(j))
         for j in range(1, len(hist))
         if hist[j]
@@ -153,11 +170,11 @@ def compute_probabilities_with_repeats(r, k, c, err, q1, q):
         if o == 1:
             res = compute_probabilities(r, k, c, err)(j)
         else:
-            res = fsum(p_oj(1, i) * p_oj(o - 1, j - i) for i in range(1, j))
+            res = sum(p_oj(1, i) * p_oj(o - 1, j - i) for i in range(1, j))
         return res
 
     b_o = lambda o: q1 if o == 1 else (1 - q1) * q * (1 - q) ** (o - 2)
-    p_j = lambda j: fsum(
+    p_j = lambda j: sum(
         b_o(o) * p_oj(o, j) for o in range(1, j + 1)
     )
     return p_j
@@ -167,7 +184,7 @@ def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q)
-    return float(fsum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j]))
+    return float(sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j]))
 
 
 @running_time_decorator
@@ -338,7 +355,10 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
 def main(args):
     orig_error_rate = args.error_rate if 'error_rate' in args else None
     orig_coverage = args.coverage if 'coverage' in args else None
-    all_kmers, unique_kmers, observed_ones, hist = load_dist(args.input_histogram, trim=args.trim)
+    autotrim = 'autotrim' in args
+    all_kmers, unique_kmers, observed_ones, hist = load_dist(
+        args.input_histogram, autotrim=autotrim, trim=args.autotrim if autotrim else args.trim
+    )
     if args.ll_only:
         ll = compute_loglikelihood(
             hist, args.read_length, args.kmer_size, orig_coverage, orig_error_rate,
@@ -350,7 +370,9 @@ def main(args):
             all_kmers, unique_kmers, observed_ones,
             args.kmer_size, args.read_length
         )
-        verbose_print('Initial guess: c: {} e: {}'.format(cov, e))
+        verbose_print('Initial guess: c: {} e: {} ll:{}'.format(cov, e, compute_loglikelihood(
+            hist, args.read_length, args.kmer_size, cov, e
+        )))
 
         # We were unable to guess cov and e, try to estimate from some fixed valid data instead
         if cov == 0 and e == 1:
@@ -379,9 +401,12 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('--plot', action='store_true', help='Plot probabilities')
-    parser.add_argument('--repeats', action='store_true', help='Estimate vith repeats')
-    parser.add_argument('--ll-only', action='store_true', help='Only compute log likelihood')
+    parser.add_argument('-rp', '--repeats', action='store_true', help='Estimate vith repeats')
+    parser.add_argument('-ll', '--ll-only', action='store_true',
+                        help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
+    parser.add_argument('-at', '--autotrim', type=int, nargs='?', default=True,
+                        help='Trim histogram at this value')
     parser.add_argument('-g', '--grid', action='store_true', default=False,
                         help='Use grid search')
 

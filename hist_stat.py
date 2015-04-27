@@ -23,7 +23,7 @@ def load_dist(fname):
                 unique_kmers += cnt
                 all_kmers += i * cnt
 
-    hist_l = [hist[i] for i in range(max_hist)]
+    hist_l = [hist[h] for h in range(max_hist)]
     return all_kmers, unique_kmers, observed_ones, hist_l
 
 
@@ -40,9 +40,25 @@ def hist_stat(hist):
         last = v
 
 
+def hist_port(hist, precision=None):
+    ss = float(sum(hist))
+    s = 0.0
+    trim = None
+    for i, h in enumerate(hist):
+        s += h
+        r = s / ss
+        if precision:
+            r = round(r, precision)
+        if r == 1 and trim is None:
+            trim = i
+        print(i, r)
+    return trim
+
+
 def main(args):
     all_kmers, unique_kmers, observed_ones, hist = load_dist(args.input_histogram)
-    hist_stat(hist)
+    t = hist_port(hist, 6)
+    print 'Trim at: ', t
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
