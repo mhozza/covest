@@ -60,7 +60,7 @@ def get_trim(hist, precision=0):
     return trim
 
 
-def load_dist(fname, autotrim=False, trim=None):
+def load_dist(fname, autotrim=None, trim=None):
     unique_kmers = 0
     all_kmers = 0.0
     observed_ones = 0
@@ -131,7 +131,7 @@ def tr_poisson(l, j):
             else:
                 p3 = BigFloat(l)
             res = p1 / (p2 * p3)
-            return res
+            return float(res)
         except (OverflowError, FloatingPointError):
             return 0.0
 
@@ -216,13 +216,16 @@ def compute_probabilities_with_repeats(r, k, c, err, q1, q2, q, hist_size, tresh
 
     p_oj = compute_repeat_table(r, k, c, err, hist_size, treshold_o)
 
-    p_j = lambda j: sum(
-        b_o(o) * p_oj[o][j]
-        for o in range(
-            1,
-            min(j + 1, treshold_o) if treshold_o is not None else j + 1
+    p_j = [0] + [
+        sum(
+            b_o(o) * p_oj[o][j]
+            for o in range(
+                1,
+                min(j + 1, treshold_o) if treshold_o is not None else j + 1
+            )
         )
-    )
+        for j in range(1, hist_size)
+    ]
     return p_j
 
 
@@ -230,7 +233,7 @@ def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q2, q):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
     p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q2, q, len(hist))
-    return float(sum(hist[j] * safe_log(p_j(j)) for j in range(1, len(hist)) if hist[j]))
+    return float(sum(hist[j] * safe_log(p_j[j]) for j in range(1, len(hist)) if hist[j]))
 
 
 @running_time_decorator
@@ -512,10 +515,14 @@ def main(args):
         print('Loglikelihood:', ll)
     else:
         verbose_print('Estimating coverage for {}'.format(args.input_histogram))
-        cov, e = compute_coverage_apx(
-            all_kmers, unique_kmers, observed_ones,
-            args.kmer_size, args.read_length
-        )
+        if args.start_original:
+            cov, e, q1, q2, q = args.c, args.e, args.q1, args.q2, args.q
+        else:
+            cov, e = compute_coverage_apx(
+                all_kmers, unique_kmers, observed_ones,
+                args.kmer_size, args.read_length
+            )
+            q1, q2, q = None, None, None
         verbose_print('Initial guess: c: {} e: {} ll:{}'.format(cov, e, compute_loglikelihood(
             hist, args.read_length, args.kmer_size, cov, e
         )))
@@ -525,12 +532,20 @@ def main(args):
             cov = 1
             e = 0.5
 
-        cov_est = compute_coverage_repeats if args.repeats else compute_coverage
-        cov2, e2 = cov_est(
-            hist, args.read_length, args.kmer_size, cov, e,
-            orig_error_rate=args.error_rate, orig_coverage=args.coverage,
-            use_grid=args.grid, use_hillclimb=args.hillclimbing,
-        )
+        if args.repeats:
+            cov2, e2 = compute_coverage_repeats(
+                hist, args.read_length, args.kmer_size, cov, e,
+                orig_error_rate=args.error_rate, orig_coverage=args.coverage,
+                orig_q1=q1, orig_q2=q2, orig_q=q,
+                use_grid=args.grid, use_hillclimb=args.hillclimbing,
+            )
+        else:
+            cov2, e2 = compute_coverage(
+                hist, args.read_length, args.kmer_size, cov, e,
+                orig_error_rate=args.error_rate, orig_coverage=args.coverage,
+                use_grid=args.grid, use_hillclimb=args.hillclimbing,
+            )
+
         if args.plot:
             plot_probs(
                 args.read_length, args.kmer_size, hist,
@@ -560,6 +575,8 @@ if __name__ == '__main__':
     parser.add_argument('-q1', type=float, help='q1')
     parser.add_argument('-q2', type=float, help='q2')
     parser.add_argument('-q', type=float, help='q')
+    parser.add_argument('-so', '--start-original', action='store_true', help='Start form given values')
+
 
     args = parser.parse_args()
     main(args)
