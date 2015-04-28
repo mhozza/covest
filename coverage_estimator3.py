@@ -143,7 +143,6 @@ def safe_log(x):
     return log(x)
 
 
-@lru_cache(maxsize=100)
 def compute_probabilities(r, k, c, err, max_hist):
     # read to kmer coverage
     c = c * (r - k + 1) / r
@@ -178,30 +177,27 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, max_hist):
 
     # read to kmer coverage
     c = c * (r - k + 1) / r
-
-    def p_o(o):
-        # lambda for kmers with s errors
-        l_s = [o * c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
-        # expected probability of kmers with s errors and coverage >= 1
-        n_s = [comb(k, s) * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(k + 1)]
-        sum_n_s = sum(n_s[t] for t in range(k + 1))
-
-        if sum_n_s == 0:  # division by zero fix
-            sum_n_s = 1
-        # portion of kmers with s errors
-        a_s = [n_s[s] / sum_n_s for s in range(k + 1)]
-        # probability that unique kmer has coverage j (j > 0)
-
-        p_j = [None] + [
-            sum(a_s[s] * tr_poisson(l_s[s], j) for s in range(k + 1))
-            for j in range(1, max_hist)
-        ]
-        return p_j
-
-    p_oj = [None] + [p_o(o) for o in range(1, max_hist)]
-
+    # lambda for kmers with s errors
+    l_s = [c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
+    # expected probability of kmers with s errors and coverage >= 1
+    n_os = [
+        [comb(k, s) * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(k + 1)]
+        for o in range(max_hist)
+    ]
+    sum_n_os = [None] + [sum(n_os[o][t] for t in range(k + 1)) for o in range(1, max_hist)]
+    # portion of kmers wit1h s errors
+    a_os = [None] + [
+        [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(k + 1)]
+        for o in range(1, max_hist)
+    ]
+    # probability that unique kmer has coverage j (j > 0)
     p_j = [None] + [
-        sum(b_o(o) * p_oj[o][j] for o in range(1, max_hist))
+        sum(
+            b_o(o) * sum(
+                a_os[o][s] * tr_poisson(o * l_s[s], j) for s in range(k + 1)
+            )
+            for o in range(1, j + 1)
+        )
         for j in range(1, max_hist)
     ]
     return p_j
