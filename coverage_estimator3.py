@@ -24,6 +24,7 @@ VERBOSE = True
 # INF = 1e100
 INF = float('inf')
 USE_BIGFLOAT = False
+model = 1
 
 
 def verbose_print(message):
@@ -164,6 +165,88 @@ def compute_probabilities(r, k, c, err, max_hist):
     return p_j
 
 
+@lru_cache(maxsize=100)
+@running_time_decorator
+def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, max_hist):
+    def b_o(o):
+        if o == 1:
+            return q1
+        elif o == 2:
+            return (1 - q1) * q2
+        else:
+            return (1 - q1) * (1 - q2) * q * (1 - q) ** (o - 3)
+
+    # read to kmer coverage
+    c = c * (r - k + 1) / r
+
+    def p_o(o):
+        # lambda for kmers with s errors
+        l_s = [o * c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
+        # expected probability of kmers with s errors and coverage >= 1
+        n_s = [comb(k, s) * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(k + 1)]
+        sum_n_s = sum(n_s[t] for t in range(k + 1))
+
+        if sum_n_s == 0:  # division by zero fix
+            sum_n_s = 1
+        # portion of kmers with s errors
+        a_s = [n_s[s] / sum_n_s for s in range(k + 1)]
+        # probability that unique kmer has coverage j (j > 0)
+
+        p_j = [None] + [
+            sum(a_s[s] * tr_poisson(l_s[s], j) for s in range(k + 1))
+            for j in range(1, max_hist)
+        ]
+        return p_j
+
+    p_oj = [None] + [p_o(o) for o in range(1, max_hist)]
+
+    p_j = [None] + [
+        sum(b_o(o) * p_oj[o][j] for o in range(1, max_hist))
+        for j in range(1, max_hist)
+    ]
+    return p_j
+
+
+@lru_cache(maxsize=100)
+@running_time_decorator
+def compute_probabilities_with_repeats3(r, k, c, err, q1, q2, q, max_hist):
+    def b_o(o):
+        if o == 0:
+            return 0
+        elif o == 1:
+            return q1
+        elif o == 2:
+            return (1 - q1) * q2
+        else:
+            return (1 - q1) * (1 - q2) * q * (1 - q) ** (o - 3)
+
+    # read to kmer coverage
+    c = c * (r - k + 1) / r
+    # lambda for kmers with s errors
+    l_os = [
+        [b_o(o) * o * c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
+        for o in range(max_hist)
+    ]
+    # expected probability of kmers with s errors and coverage >= 1
+    n_os = [
+        [comb(k, s) * (3 ** s) * (1.0 - exp(-l_os[o][s])) for s in range(k + 1)]
+        for o in range(max_hist)
+    ]
+    sum_n_os = sum(n_os[o][s] for s in range(k + 1) for o in range(max_hist))
+
+    if sum_n_os == 0:  # division by zero fix
+        sum_n_os = 1
+    # portion of kmers with s errors
+    a_os = [[n_os[o][s] / sum_n_os for s in range(k + 1)] for o in range(max_hist)]
+    # probability that unique kmer has coverage j (j > 0)
+
+    p_j = [None] + [
+        sum(a_os[o][s] * tr_poisson(l_os[o][s], j) for s in range(k + 1) for o in range(max_hist))
+        for j in range(1, max_hist)
+    ]
+    return p_j
+
+
 def compute_loglikelihood(hist, r, k, c, err):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
@@ -179,7 +262,7 @@ def compute_loglikelihood(hist, r, k, c, err):
 def compute_repeat_table(r, k, c, err, hist_size, treshold_o=None):
     p_j = compute_probabilities(r, k, c, err, hist_size)
     p_oj = [
-        [None], [None] + [p_j[j] for j in range(1, hist_size)]
+        [None], p_j
     ]
 
     if treshold_o is None:
@@ -232,7 +315,12 @@ def compute_probabilities_with_repeats(r, k, c, err, q1, q2, q, hist_size, tresh
 def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q2, q):
     if err < 0 or err >= 1 or c <= 0:
         return -INF
-    p_j = compute_probabilities_with_repeats(r, k, c, err, q1, q2, q, len(hist))
+    compute_probabilities_fs = [
+        compute_probabilities_with_repeats,
+        compute_probabilities_with_repeats2,
+        compute_probabilities_with_repeats3,
+    ]
+    p_j = compute_probabilities_fs[model](r, k, c, err, q1, q2, q, len(hist))
     return float(sum(hist[j] * safe_log(p_j[j]) for j in range(1, len(hist)) if hist[j]))
 
 
@@ -499,6 +587,8 @@ def minimize_hillclimbing(fn, initial_guess, bounds=None, oprions=None, iteratio
 
 @running_time_decorator
 def main(args):
+    global model
+    model = args.model
     all_kmers, unique_kmers, observed_ones, hist = load_dist(
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
@@ -575,8 +665,10 @@ if __name__ == '__main__':
     parser.add_argument('-q1', type=float, help='q1')
     parser.add_argument('-q2', type=float, help='q2')
     parser.add_argument('-q', type=float, help='q')
-    parser.add_argument('-so', '--start-original', action='store_true', help='Start form given values')
-
+    parser.add_argument('-so', '--start-original', action='store_true',
+                        help='Start form given values')
+    parser.add_argument('-m', '--model', default=1, type=int,
+                        help='Model to use for estimation')
 
     args = parser.parse_args()
     main(args)
