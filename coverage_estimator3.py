@@ -166,7 +166,7 @@ def compute_probabilities(r, k, c, err, max_hist):
 
 @lru_cache(maxsize=100)
 @running_time_decorator
-def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, max_hist):
+def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
     def b_o(o):
         if o == 1:
             return q1
@@ -175,6 +175,13 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, max_hist):
         else:
             return (1 - q1) * (1 - q2) * q * (1 - q) ** (o - 3)
 
+    treshold_o = None
+    if treshold is not None:
+        for o in range(1, hist_size):
+            if b_o(o) < treshold:
+                treshold_o = o
+                break
+
     # read to kmer coverage
     c = c * (r - k + 1) / r
     # lambda for kmers with s errors
@@ -182,13 +189,13 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, max_hist):
     # expected probability of kmers with s errors and coverage >= 1
     n_os = [
         [comb(k, s) * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(k + 1)]
-        for o in range(max_hist)
+        for o in range(hist_size)
     ]
-    sum_n_os = [None] + [sum(n_os[o][t] for t in range(k + 1)) for o in range(1, max_hist)]
+    sum_n_os = [None] + [sum(n_os[o][t] for t in range(k + 1)) for o in range(1, hist_size)]
     # portion of kmers wit1h s errors
     a_os = [None] + [
         [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(k + 1)]
-        for o in range(1, max_hist)
+        for o in range(1, hist_size)
     ]
     # probability that unique kmer has coverage j (j > 0)
     p_j = [None] + [
@@ -196,16 +203,16 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, max_hist):
             b_o(o) * sum(
                 a_os[o][s] * tr_poisson(o * l_s[s], j) for s in range(k + 1)
             )
-            for o in range(1, j + 1)
+            for o in range(1, min(j + 1, treshold_o) if treshold_o is not None else j + 1)
         )
-        for j in range(1, max_hist)
+        for j in range(1, hist_size)
     ]
     return p_j
 
 
 @lru_cache(maxsize=100)
 @running_time_decorator
-def compute_probabilities_with_repeats3(r, k, c, err, q1, q2, q, max_hist):
+def compute_probabilities_with_repeats3(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
     def b_o(o):
         if o == 0:
             return 0
@@ -216,29 +223,41 @@ def compute_probabilities_with_repeats3(r, k, c, err, q1, q2, q, max_hist):
         else:
             return (1 - q1) * (1 - q2) * q * (1 - q) ** (o - 3)
 
+    treshold_o = None
+    if treshold is not None:
+        for o in range(1, hist_size):
+            if b_o(o) < treshold:
+                treshold_o = o
+                break
+
     # read to kmer coverage
     c = c * (r - k + 1) / r
     # lambda for kmers with s errors
     l_os = [
         [b_o(o) * o * c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
-        for o in range(max_hist)
+        for o in range(hist_size)
     ]
     # expected probability of kmers with s errors and coverage >= 1
     n_os = [
         [comb(k, s) * (3 ** s) * (1.0 - exp(-l_os[o][s])) for s in range(k + 1)]
-        for o in range(max_hist)
+        for o in range(hist_size)
     ]
-    sum_n_os = sum(n_os[o][s] for s in range(k + 1) for o in range(max_hist))
+    sum_n_os = sum(n_os[o][s] for s in range(k + 1) for o in range(hist_size))
 
     if sum_n_os == 0:  # division by zero fix
         sum_n_os = 1
     # portion of kmers with s errors
-    a_os = [[n_os[o][s] / sum_n_os for s in range(k + 1)] for o in range(max_hist)]
+    a_os = [[n_os[o][s] / sum_n_os for s in range(k + 1)] for o in range(hist_size)]
     # probability that unique kmer has coverage j (j > 0)
 
     p_j = [None] + [
-        sum(a_os[o][s] * tr_poisson(l_os[o][s], j) for s in range(k + 1) for o in range(max_hist))
-        for j in range(1, max_hist)
+        sum(
+            a_os[o][s] * tr_poisson(l_os[o][s], j) for s in range(k + 1)
+            for o in range(
+                1, min(j + 1, treshold_o) if treshold_o is not None else j + 1
+            )
+        )
+        for j in range(1, hist_size)
     ]
     return p_j
 
