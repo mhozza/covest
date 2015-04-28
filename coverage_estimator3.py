@@ -23,6 +23,7 @@ ERROR_RATE = 0.03
 VERBOSE = True
 # INF = 1e100
 INF = float('inf')
+USE_BIGFLOAT = False
 
 
 def verbose_print(message):
@@ -32,6 +33,8 @@ def verbose_print(message):
 
 
 try:
+    if not USE_BIGFLOAT:
+        raise ImportError("USE_BIGFLOAT is false")
     from bigfloat import BigFloat, exp, log, pow
 except ImportError:
     from math import exp, log, pow
@@ -43,7 +46,7 @@ def estimate_p(cc, alpha):
     return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
 
 
-def get_trim(hist, precision=None):
+def get_trim(hist, precision=0):
     ss = float(sum(hist))
     s = 0.0
     trim = None
@@ -78,7 +81,7 @@ def load_dist(fname, autotrim=False, trim=None):
                 all_kmers += i * cnt
 
     hist_l = [hist[b] for b in range(max_hist)]
-    if autotrim:
+    if autotrim is not None:
         trim = get_trim(hist_l, autotrim)
         verbose_print('Trimming at: {}'.format(trim))
         hist_l = hist_l[:trim]
@@ -283,7 +286,8 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
 @running_time_decorator
 def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
                              guessed_q1=0.5, guessed_q2=0.5, guessed_q=0.5,
-                             error_rate=None, orig_coverage=None,
+                             orig_error_rate=None, orig_coverage=None,
+                             orig_q1=None, orig_q2=None, orig_q=None,
                              use_grid=False, use_hillclimb=True):
 
     likelihood_f = lambda x: -compute_loglikelihood_with_repeats(
@@ -324,12 +328,21 @@ def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
         'estimated_q': q,
     }
 
-    if error_rate is not None:
-        output_data['original_error_rate'] = error_rate
+    if orig_error_rate is not None:
+        output_data['original_error_rate'] = orig_error_rate
+    else:
+        orig_error_rate = e
 
-    if error_rate is not None and orig_coverage is not None:
+    if orig_q1 is None:
+        orig_q1 = q1
+    if orig_q2 is None:
+        orig_q2 = q2
+    if orig_q is None:
+        orig_q = q
+
+    if orig_coverage is not None:
         output_data['original_loglikelihood'] = -likelihood_f(
-            [orig_coverage, error_rate, q1, q2, q]
+            [orig_coverage, orig_error_rate, orig_q1, orig_q2, orig_q]
         )
 
     print(json.dumps(
@@ -481,15 +494,19 @@ def minimize_hillclimbing(fn, initial_guess, bounds=None, oprions=None, iteratio
 
 @running_time_decorator
 def main(args):
-    orig_error_rate = args.error_rate if 'error_rate' in args else None
-    orig_coverage = args.coverage if 'coverage' in args else None
     all_kmers, unique_kmers, observed_ones, hist = load_dist(
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
     if args.ll_only:
-        ll = compute_loglikelihood(
-            hist, args.read_length, args.kmer_size, orig_coverage, orig_error_rate,
-        )
+        if args.repeats:
+            ll = compute_loglikelihood_with_repeats(
+                hist, args.read_length, args.kmer_size,
+                args.coverage, args.error_rate, args.q1, args.q2, args.q
+            )
+        else:
+            ll = compute_loglikelihood(
+                hist, args.read_length, args.kmer_size, args.coverage, args.error_rate,
+            )
         print('Loglikelihood:', ll)
     else:
         verbose_print('Estimating coverage for {}'.format(args.input_histogram))
@@ -509,13 +526,13 @@ def main(args):
         cov_est = compute_coverage_repeats if args.repeats else compute_coverage
         cov2, e2 = cov_est(
             hist, args.read_length, args.kmer_size, cov, e,
-            error_rate=orig_error_rate, orig_coverage=orig_coverage,
+            error_rate=args.error_rate, orig_coverage=args.coverage,
             use_grid=args.grid, use_hillclimb=args.hillclimbing,
         )
         if args.plot:
             plot_probs(
                 args.read_length, args.kmer_size, hist,
-                cov2, e2, cov, e, orig_coverage, orig_error_rate,
+                cov2, e2, cov, e, args.coverage, args.error_rate,
             )
 
 if __name__ == '__main__':
@@ -525,19 +542,22 @@ if __name__ == '__main__':
                         default=DEFAULT_K, help='Kmer size')
     parser.add_argument('-r', '--read-length', type=int,
                         default=DEFAULT_READ_LENGTH, help='Read length')
-    parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
-    parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('--plot', action='store_true', help='Plot probabilities')
     parser.add_argument('-rp', '--repeats', action='store_true', help='Estimate vith repeats')
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
-    parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=False,
+    parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=0,
                         help='Trim histogram at this value')
     parser.add_argument('-g', '--grid', action='store_true', default=False,
                         help='Use grid search')
     parser.add_argument('-hc', '--hillclimbing', action='store_true', default=False,
                         help='Use hill climbing')
+    parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
+    parser.add_argument('-c', '--coverage', type=float, help='Coverage')
+    parser.add_argument('-q1', type=float, help='q1')
+    parser.add_argument('-q2', type=float, help='q2')
+    parser.add_argument('-q', type=float, help='q')
 
     args = parser.parse_args()
     main(args)
