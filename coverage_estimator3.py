@@ -235,7 +235,7 @@ def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q2, q):
 
 @running_time_decorator
 def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
-                     error_rate=None, orig_coverage=None,
+                     orig_error_rate=None, orig_coverage=None,
                      use_grid=False, use_hillclimb=False):
     likelihood_f = lambda x: -compute_loglikelihood(
         hist, args.read_length, args.kmer_size, x[0], x[1]
@@ -270,11 +270,13 @@ def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
         'estimated_loglikelihood': -likelihood_f([cov, e]),
     }
 
-    if error_rate is not None:
-        output_data['original_error_rate'] = error_rate
+    if orig_error_rate is not None:
+        output_data['original_error_rate'] = orig_error_rate
+    else:
+        orig_error_rate = e
 
-    if error_rate is not None and orig_coverage is not None:
-        output_data['original_loglikelihood'] = -likelihood_f([orig_coverage, error_rate])
+    if orig_coverage is not None:
+        output_data['original_loglikelihood'] = -likelihood_f([orig_coverage, orig_error_rate])
 
     print(json.dumps(
         output_data, sort_keys=True, indent=4, separators=(',', ': ')
@@ -526,7 +528,7 @@ def main(args):
         cov_est = compute_coverage_repeats if args.repeats else compute_coverage
         cov2, e2 = cov_est(
             hist, args.read_length, args.kmer_size, cov, e,
-            error_rate=args.error_rate, orig_coverage=args.coverage,
+            orig_error_rate=args.error_rate, orig_coverage=args.coverage,
             use_grid=args.grid, use_hillclimb=args.hillclimbing,
         )
         if args.plot:
