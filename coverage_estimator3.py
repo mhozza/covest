@@ -12,6 +12,7 @@ from perf import running_time_decorator
 from functools import lru_cache
 import json
 import random
+from math import exp, log
 # from utils import print_wrap as pw
 
 # defaults
@@ -36,11 +37,9 @@ def verbose_print(message):
 try:
     if not USE_BIGFLOAT:
         raise ImportError("USE_BIGFLOAT is false")
-    from bigfloat import BigFloat, exp, log, pow
+    from bigfloat import BigFloat
 except ImportError:
-    from math import exp, log, pow
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
-    BigFloat = lambda x: float(x)
 
 
 def estimate_p(cc, alpha):
@@ -125,15 +124,20 @@ def tr_poisson(l, j):
         try:
             if exp(l) == 1.0:  # precision fix
                 return 0.0
-            p1 = BigFloat(pow(l, j))
-            p2 = BigFloat(factorial(j, exact=True))
+            p1 = l ** j
+            p2 = factorial(j, exact=True)
+            if USE_BIGFLOAT:
+                p2 = BigFloat(p2)
             if l > 1e-8:
-                p3 = BigFloat(exp(l) - 1.0)
+                p3 = exp(l) - 1.0
             else:
-                p3 = BigFloat(l)
+                p3 = l
             res = p1 / (p2 * p3)
             return float(res)
-        except (OverflowError, FloatingPointError):
+        except (OverflowError, FloatingPointError) as e:
+            verbose_print(
+                'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(l, j, e)
+            )
             return 0.0
 
 
@@ -164,8 +168,7 @@ def compute_probabilities(r, k, c, err, max_hist):
     return p_j
 
 
-@lru_cache(maxsize=100)
-@running_time_decorator
+@lru_cache(maxsize=None)
 def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
     def b_o(o):
         if o == 1:
@@ -181,6 +184,8 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, tres
             if b_o(o) < treshold:
                 treshold_o = o
                 break
+    else:
+        treshold_o = hist_size
 
     # read to kmer coverage
     c = c * (r - k + 1) / r
@@ -189,13 +194,13 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, tres
     # expected probability of kmers with s errors and coverage >= 1
     n_os = [
         [comb(k, s) * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(k + 1)]
-        for o in range(hist_size)
+        for o in range(treshold_o)
     ]
-    sum_n_os = [None] + [sum(n_os[o][t] for t in range(k + 1)) for o in range(1, hist_size)]
+    sum_n_os = [None] + [sum(n_os[o][t] for t in range(k + 1)) for o in range(1, treshold_o)]
     # portion of kmers wit1h s errors
     a_os = [None] + [
         [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(k + 1)]
-        for o in range(1, hist_size)
+        for o in range(1, treshold_o)
     ]
     # probability that unique kmer has coverage j (j > 0)
     p_j = [None] + [
@@ -210,8 +215,7 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, tres
     return p_j
 
 
-@lru_cache(maxsize=100)
-@running_time_decorator
+@lru_cache(maxsize=None)
 def compute_probabilities_with_repeats3(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
     def b_o(o):
         if o == 0:
