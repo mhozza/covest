@@ -147,6 +147,13 @@ def safe_log(x):
     return log(x)
 
 
+def fix_zero(x, val=1):
+    if x == 0:
+        return val
+    else:
+        return x
+
+
 def compute_probabilities(r, k, c, err, max_hist):
     # read to kmer coverage
     c = c * (r - k + 1) / r
@@ -154,10 +161,7 @@ def compute_probabilities(r, k, c, err, max_hist):
     l_s = [c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
     # expected probability of kmers with s errors and coverage >= 1
     n_s = [comb(k, s) * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(k + 1)]
-    sum_n_s = sum(n_s[t] for t in range(k + 1))
-
-    if sum_n_s == 0:  # division by zero fix
-        sum_n_s = 1
+    sum_n_s = fix_zero(sum(n_s[t] for t in range(k + 1)))
     # portion of kmers with s errors
     a_s = [n_s[s] / sum_n_s for s in range(k + 1)]
     # probability that unique kmer has coverage j (j > 0)
@@ -171,7 +175,9 @@ def compute_probabilities(r, k, c, err, max_hist):
 @lru_cache(maxsize=None)
 def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
     def b_o(o):
-        if o == 1:
+        if o == 0:
+            return 0
+        elif o == 1:
             return q1
         elif o == 2:
             return (1 - q1) * q2
@@ -192,11 +198,14 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, tres
     # lambda for kmers with s errors
     l_s = [c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
     # expected probability of kmers with s errors and coverage >= 1
-    n_os = [
+    n_os = [None] + [
         [comb(k, s) * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(k + 1)]
-        for o in range(treshold_o)
+        for o in range(1, treshold_o)
     ]
-    sum_n_os = [None] + [sum(n_os[o][t] for t in range(k + 1)) for o in range(1, treshold_o)]
+    sum_n_os = [None] + [
+        fix_zero(sum(n_os[o][t] for t in range(k + 1))) for o in range(1, treshold_o)
+    ]
+
     # portion of kmers wit1h s errors
     a_os = [None] + [
         [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(k + 1)]
@@ -208,10 +217,11 @@ def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, tres
             b_o(o) * sum(
                 a_os[o][s] * tr_poisson(o * l_s[s], j) for s in range(k + 1)
             )
-            for o in range(1, min(j + 1, treshold_o) if treshold_o is not None else j + 1)
+            for o in range(1, min(j + 1, treshold_o))
         )
         for j in range(1, hist_size)
     ]
+    print(p_j)
     return p_j
 
 
@@ -246,10 +256,8 @@ def compute_probabilities_with_repeats3(r, k, c, err, q1, q2, q, hist_size, tres
         [comb(k, s) * (3 ** s) * (1.0 - exp(-l_os[o][s])) for s in range(k + 1)]
         for o in range(hist_size)
     ]
-    sum_n_os = sum(n_os[o][s] for s in range(k + 1) for o in range(hist_size))
+    sum_n_os = fix_zero(sum(n_os[o][s] for s in range(k + 1) for o in range(hist_size)))
 
-    if sum_n_os == 0:  # division by zero fix
-        sum_n_os = 1
     # portion of kmers with s errors
     a_os = [[n_os[o][s] / sum_n_os for s in range(k + 1)] for o in range(hist_size)]
     # probability that unique kmer has coverage j (j > 0)
