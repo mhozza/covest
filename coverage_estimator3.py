@@ -2,7 +2,7 @@
 import sys
 import itertools
 from collections import defaultdict
-from scipy.misc import comb, factorial
+import scipy.misc
 from scipy.optimize import minimize
 import argparse
 from inverse import inverse
@@ -16,7 +16,7 @@ from math import exp, log
 # from utils import print_wrap as pw
 
 # defaults
-DEFAULT_K = 20
+DEFAULT_K = 21
 DEFAULT_READ_LENGTH = 100
 ERROR_RATE = 0.03
 
@@ -26,6 +26,16 @@ VERBOSE = True
 INF = float('inf')
 USE_BIGFLOAT = False
 model = 1
+
+
+@lru_cache(maxsize=None)
+def comb(n, k):
+    return scipy.misc.comb(n, k)
+
+
+@lru_cache(maxsize=None)
+def factorial(n):
+    return scipy.misc.factorial(n, exact=True)
 
 
 def verbose_print(message):
@@ -119,28 +129,6 @@ def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
         return 0.0, float(e)
 
 
-def tr_poisson(l, j):
-    with numpy.errstate(over='raise'):
-        try:
-            if exp(l) == 1.0:  # precision fix
-                return 0.0
-            p1 = l ** j
-            p2 = factorial(j, exact=True)
-            if USE_BIGFLOAT:
-                p2 = BigFloat(p2)
-            if l > 1e-8:
-                p3 = exp(l) - 1.0
-            else:
-                p3 = l
-            res = p1 / (p2 * p3)
-            return float(res)
-        except (OverflowError, FloatingPointError) as e:
-            verbose_print(
-                'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(l, j, e)
-            )
-            return 0.0
-
-
 def safe_log(x):
     if x <= 0:
         return -INF
@@ -154,358 +142,333 @@ def fix_zero(x, val=1):
         return x
 
 
-def compute_probabilities(r, k, c, err, max_hist):
-    # read to kmer coverage
-    c = c * (r - k + 1) / r
-    # lambda for kmers with s errors
-    l_s = [c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
-    # expected probability of kmers with s errors and coverage >= 1
-    n_s = [comb(k, s) * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(k + 1)]
-    sum_n_s = fix_zero(sum(n_s[t] for t in range(k + 1)))
-    # portion of kmers with s errors
-    a_s = [n_s[s] / sum_n_s for s in range(k + 1)]
-    # probability that unique kmer has coverage j (j > 0)
+class BasicModel:
+    def __init__(self, k, r, hist):
+        self.repeats = False
+        self.k = k
+        self.r = r
+        self.bounds = ((0.0, None), (0.0, 1.0))
+        self.comb = [comb(k, s) for s in range(k + 1)]
+        self.hist = hist
+        self.factorial = [1]
+        for i in range(1, len(hist)):
+            t = self.factorial[-1] * i
+            if USE_BIGFLOAT:
+                t = BigFloat(t)
+            else:
+                t = float(t)
+            self.factorial.append(t)
 
-    p_j = [None] + [
-        sum(a_s[s] * tr_poisson(l_s[s], j) for s in range(k + 1)) for j in range(1, max_hist)
-    ]
-    return p_j
+    def correct_c(self, c):
+        return c * (self.r - self.k + 1) / self.r
 
+    def tr_poisson(self, l, j):
+        with numpy.errstate(over='raise'):
+            try:
+                if exp(l) == 1.0:  # precision fix
+                    return 0.0
+                p1 = l ** j
+                p2 = self.factorial[j]
+                if l > 1e-8:
+                    p3 = exp(l) - 1.0
+                else:
+                    p3 = l
+                res = p1 / (p2 * p3)
+                return float(res)
+            except (OverflowError, FloatingPointError) as e:
+                verbose_print(
+                    'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(l, j, e)
+                )
+                return 0.0
 
-@lru_cache(maxsize=None)
-def compute_probabilities_with_repeats2(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
-    def b_o(o):
-        if o == 0:
-            return 0
-        elif o == 1:
-            return q1
-        elif o == 2:
-            return (1 - q1) * q2
-        else:
-            return (1 - q1) * (1 - q2) * q * (1 - q) ** (o - 3)
-
-    treshold_o = None
-    if treshold is not None:
-        for o in range(1, hist_size):
-            if b_o(o) < treshold:
-                treshold_o = o
-                break
-    else:
-        treshold_o = hist_size
-
-    # read to kmer coverage
-    c = c * (r - k + 1) / r
-    # lambda for kmers with s errors
-    l_s = [c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
-    # expected probability of kmers with s errors and coverage >= 1
-    n_os = [None] + [
-        [comb(k, s) * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(k + 1)]
-        for o in range(1, treshold_o)
-    ]
-    sum_n_os = [None] + [
-        fix_zero(sum(n_os[o][t] for t in range(k + 1))) for o in range(1, treshold_o)
-    ]
-
-    # portion of kmers wit1h s errors
-    a_os = [None] + [
-        [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(k + 1)]
-        for o in range(1, treshold_o)
-    ]
-    # probability that unique kmer has coverage j (j > 0)
-    p_j = [None] + [
-        sum(
-            b_o(o) * sum(
-                a_os[o][s] * tr_poisson(o * l_s[s], j) for s in range(k + 1)
+    def compute_probabilities(self, c, err, *args):
+        # read to kmer coverage
+        c = self.correct_c(c)
+        # lambda for kmers with s errors
+        l_s = [c * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s for s in range(self.k + 1)]
+        # expected probability of kmers with s errors and coverage >= 1
+        n_s = [self.comb[s] * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(self.k + 1)]
+        sum_n_s = fix_zero(sum(n_s[t] for t in range(self.k + 1)))
+        # portion of kmers with s errors
+        a_s = [n_s[s] / sum_n_s for s in range(self.k + 1)]
+        # probability that unique kmer has coverage j (j > 0)
+        max_hist = len(self.hist)
+        p_j = [None] + [
+            sum(
+                a_s[s] * self.tr_poisson(l_s[s], j)
+                for s in range(self.k + 1)
             )
-            for o in range(1, min(j + 1, treshold_o))
-        )
-        for j in range(1, hist_size)
-    ]
-    print(p_j)
-    return p_j
+            for j in range(1, max_hist)
+        ]
+        return p_j
 
+    def compute_loglikelihood(self, *args):
+        c, err = args[:2]
+        if err < 0 or err >= 1 or c <= 0:
+            return -INF
+        p_j = self.compute_probabilities(*args)
+        return float(sum(
+            self.hist[j] * safe_log(p_j[j])
+            for j in range(1, len(self.hist))
+            if self.hist[j]
+        ))
 
-@lru_cache(maxsize=None)
-def compute_probabilities_with_repeats3(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
-    def b_o(o):
-        if o == 0:
-            return 0
-        elif o == 1:
-            return q1
-        elif o == 2:
-            return (1 - q1) * q2
+    def plot_probs(self, est, guess, orig):
+        def fmt(p):
+            print(['{:.3f}'.format(x) for x in p[1:20]])
+
+        hs = float(sum(self.hist))
+        hp = [f / hs for f in self.hist]
+        ep = self.compute_probabilities(*est)
+        gp = self.compute_probabilities(*guess)
+        if orig is not None:
+            op = self.compute_probabilities(*orig)
         else:
-            return (1 - q1) * (1 - q2) * q * (1 - q) ** (o - 3)
+            op = [0 for j in range(len(self.hist))]
+        plt.plot(
+            range(len(hp)), hp, 'ko',
+            label='hist',
+            ms=8,
+        )
+        plt.plot(
+            range(len(ep)), ep, 'ro',
+            label='est: {}'.format(fmt(est)),
+            ms=6,
+        )
+        plt.plot(
+            range(len(gp)), gp, 'go',
+            label='guess: {}'.format(fmt(guess)),
+            ms=5,
+        )
+        plt.plot(
+            range(len(op)), op, 'co',
+            label='orig: {}'.format(fmt(orig)),
+            ms=4,
+        )
+        plt.legend()
+        plt.show()
 
-    treshold_o = None
-    if treshold is not None:
-        for o in range(1, hist_size):
-            if b_o(o) < treshold:
-                treshold_o = o
-                break
 
-    # read to kmer coverage
-    c = c * (r - k + 1) / r
-    # lambda for kmers with s errors
-    l_os = [
-        [b_o(o) * o * c * (3 ** -s) * (1.0 - err) ** (k - s) * err ** s for s in range(k + 1)]
-        for o in range(hist_size)
-    ]
-    # expected probability of kmers with s errors and coverage >= 1
-    n_os = [
-        [comb(k, s) * (3 ** s) * (1.0 - exp(-l_os[o][s])) for s in range(k + 1)]
-        for o in range(hist_size)
-    ]
-    sum_n_os = fix_zero(sum(n_os[o][s] for s in range(k + 1) for o in range(hist_size)))
+class RepeatsModel2(BasicModel):
+    def __init__(self, k, r, hist, treshold=1e-8):
+        super(RepeatsModel2, self).__init__(k, r, hist)
+        self.repeats = False
+        self.bounds = ((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
+        self.treshold = treshold
 
-    # portion of kmers with s errors
-    a_os = [[n_os[o][s] / sum_n_os for s in range(k + 1)] for o in range(hist_size)]
-    # probability that unique kmer has coverage j (j > 0)
+    def get_hist_treshold(self, b_o, treshold):
+        hist_size = len(self.hist)
+        if treshold is not None:
+            for o in range(1, hist_size):
+                if b_o(o) < treshold:
+                    return o
+        return hist_size
 
-    p_j = [None] + [
-        sum(
-            a_os[o][s] * tr_poisson(l_os[o][s], j) for s in range(k + 1)
-            for o in range(
-                1, min(j + 1, treshold_o) if treshold_o is not None else j + 1
+    def get_b_o(self, q1, q2, q):
+        o_2 = (1 - q1) * q2
+        o_n = (1 - q1) * (1 - q2) * q
+
+        def b_o(o):
+            if o == 0:
+                return 0
+            elif o == 1:
+                return q1
+            elif o == 2:
+                return o_2
+            else:
+                return o_n * (1 - q) ** (o - 3)
+        return b_o
+
+    def compute_probabilities(self, c, err, q1, q2, q):
+        b_o = self.get_b_o(q1, q2, q)
+        treshold_o = self.get_hist_treshold(b_o, self.treshold)
+        # read to kmer coverage
+        c = self.correct_c(c)
+        # lambda for kmers with s errors
+        l_s = [c * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s for s in range(self.k + 1)]
+        # expected probability of kmers with s errors and coverage >= 1
+        n_os = [None] + [
+            [self.comb[s] * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(self.k + 1)]
+            for o in range(1, treshold_o)
+        ]
+        sum_n_os = [None] + [
+            fix_zero(sum(n_os[o][t] for t in range(self.k + 1))) for o in range(1, treshold_o)
+        ]
+
+        # portion of kmers wit1h s errors
+        a_os = [None] + [
+            [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(self.k + 1)]
+            for o in range(1, treshold_o)
+        ]
+        # probability that unique kmer has coverage j (j > 0)
+        p_j = [None] + [
+            sum(
+                b_o(o) * sum(
+                    a_os[o][s] * self.tr_poisson(o * l_s[s], j) for s in range(self.k + 1)
+                )
+                for o in range(1, min(j + 1, treshold_o))
             )
-        )
-        for j in range(1, hist_size)
-    ]
-    return p_j
+            for j in range(1, len(self.hist))
+        ]
+        return p_j
 
 
-def compute_loglikelihood(hist, r, k, c, err):
-    if err < 0 or err >= 1 or c <= 0:
-        return -INF
-    p_j = compute_probabilities(r, k, c, err, len(hist))
-    return float(sum(
-        hist[j] * safe_log(p_j[j])
-        for j in range(1, len(hist))
-        if hist[j]
-    ))
+class RepeatsModel3(RepeatsModel2):
+    def compute_probabilities_with_repeats3(self, c, err, q1, q2, q):
+        b_o = self.get_b_o(q1, q2, q)
+        treshold_o = self.get_hist_treshold(b_o, self.treshold)
+        # read to kmer coverage
+        c = self.correct_c(c)
+        # lambda for kmers with s errors
+        l_os = [
+            [
+                b_o(o) * o * c * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s
+                for s in range(self.k + 1)
+            ]
+            for o in range(treshold_o)
+        ]
+        # expected probability of kmers with s errors and coverage >= 1
+        n_os = [
+            [self.comb[s] * (3 ** s) * (1.0 - exp(-l_os[o][s])) for s in range(self.k + 1)]
+            for o in range(treshold_o)
+        ]
+        sum_n_os = fix_zero(sum(n_os[o][s] for s in range(self.k + 1) for o in range(treshold_o)))
 
+        # portion of kmers with s errors
+        a_os = [[n_os[o][s] / sum_n_os for s in range(self.k + 1)] for o in range(treshold_o)]
+        # probability that unique kmer has coverage j (j > 0)
 
-@lru_cache(maxsize=100)
-def compute_repeat_table(r, k, c, err, hist_size, treshold_o=None):
-    p_j = compute_probabilities(r, k, c, err, hist_size)
-    p_oj = [
-        [None], p_j
-    ]
-
-    if treshold_o is None:
-        treshold_o = hist_size
-
-    for o in range(2, treshold_o):
-        p = [[None]]
-        for j in range(1, hist_size):
-            res = 0.0
-            for i in range(1, j):
-                t = p_oj[1][i] * p_oj[o - 1][j - i]
-                res += t
-            p.append(res)
-        p_oj.append(p)
-
-    return p_oj
-
-
-def compute_probabilities_with_repeats(r, k, c, err, q1, q2, q, hist_size, treshold=1e-8):
-    def b_o(o):
-        if o == 1:
-            return q1
-        elif o == 2:
-            return (1 - q1) * q2
-        else:
-            return (1 - q1) * (1 - q2) * q * (1 - q) ** (o - 3)
-
-    treshold_o = None
-    if treshold is not None:
-        for o in range(1, hist_size):
-            if b_o(o) < treshold:
-                treshold_o = o
-                break
-
-    p_oj = compute_repeat_table(r, k, c, err, hist_size, treshold_o)
-
-    p_j = [0] + [
-        sum(
-            b_o(o) * p_oj[o][j]
-            for o in range(
-                1,
-                min(j + 1, treshold_o) if treshold_o is not None else j + 1
+        p_j = [None] + [
+            sum(
+                a_os[o][s] * self.tr_poisson(l_os[o][s], j) for s in range(self.k + 1)
+                for o in range(
+                    1, min(j + 1, treshold_o) if treshold_o is not None else j + 1
+                )
             )
+            for j in range(1, len(self.hist))
+        ]
+        return p_j
+
+
+class RepeatsModel(RepeatsModel2):
+    @lru_cache(maxsize=100)
+    def compute_repeat_table(self, c, err, treshold_o):
+        p_j = super(BasicModel, self).compute_probabilities(c, err)
+        p_oj = [
+            [None], p_j
+        ]
+
+        hist_size = len(self.hist)
+        if treshold_o is None:
+            treshold_o = hist_size
+
+        for o in range(2, treshold_o):
+            p = [[None]]
+            for j in range(1, hist_size):
+                res = 0.0
+                for i in range(1, j):
+                    t = p_oj[1][i] * p_oj[o - 1][j - i]
+                    res += t
+                p.append(res)
+            p_oj.append(p)
+
+        return p_oj
+
+    def compute_probabilities_with_repeats(self, c, err, q1, q2, q):
+        b_o = self.get_b_o(q1, q2, q)
+        treshold_o = self.get_hist_treshold(b_o, self.treshold)
+        p_oj = self.compute_repeat_table(c, err, treshold_o)
+
+        p_j = [0] + [
+            sum(
+                b_o(o) * p_oj[o][j]
+                for o in range(
+                    1,
+                    min(j + 1, treshold_o) if treshold_o is not None else j + 1
+                )
+            )
+            for j in range(1, len(self.hist))
+        ]
+        return p_j
+
+
+class CoverageEstimator:
+    def __init__(self, model, *args, **kwargs):
+        self.model = model
+        self.likelihood_f = lambda x: -self.model.compute_loglikelihood(*x)
+
+    def compute_coverage(self, guess, use_grid=False, use_hillclimb=False):
+        res = minimize(
+            self.likelihood_f, guess,
+            bounds=self.model.bounds,
+            options={'disp': True}
         )
-        for j in range(1, hist_size)
-    ]
-    return p_j
+        r = res.x
 
+        if use_hillclimb:
+            verbose_print('Starting hillclimbing search with guess: {}'.format(res.x))
+            r = minimize_hillclimbing(
+                self.likelihood_f, r,
+                bounds=self.model.bounds,
+            )
 
-def compute_loglikelihood_with_repeats(hist, r, k, c, err, q1, q2, q):
-    if err < 0 or err >= 1 or c <= 0:
-        return -INF
-    compute_probabilities_fs = [
-        compute_probabilities_with_repeats,
-        compute_probabilities_with_repeats2,
-        compute_probabilities_with_repeats3,
-    ]
-    p_j = compute_probabilities_fs[model](r, k, c, err, q1, q2, q, len(hist))
-    return float(sum(hist[j] * safe_log(p_j[j]) for j in range(1, len(hist)) if hist[j]))
+        if use_grid:
+            verbose_print('Starting grid search with guess: {}'.format(res.x))
+            r = minimize_grid(
+                self.likelihood_f, r, bounds=self.model.bounds
+            )
 
+    def print_output(self, estimated=None, guess=None,
+                     orig_coverage=None, orig_error_rate=None,
+                     orig_q1=None, orig_q2=None, orig_q=None,
+                     repeats=False, silent=False):
+        output_data = dict()
 
-@running_time_decorator
-def compute_coverage(hist, r, k, guessed_c=10, guessed_e=0.05,
-                     orig_error_rate=None, orig_coverage=None,
-                     use_grid=False, use_hillclimb=False):
-    likelihood_f = lambda x: -compute_loglikelihood(
-        hist, args.read_length, args.kmer_size, x[0], x[1]
-    )
-    x0 = [guessed_c, guessed_e]
-    res = minimize(
-        likelihood_f, x0,
-        bounds=((0.0, None), (0.0, 1.0)),
-        options={'disp': True}
-    )
-    cov, e = res.x
+        if guess is not None:
+            output_data['guessed_loglikelihood'] = -self.likelihood_f(guess)
+            output_data['guessed_coverage'] = guess[0]
+            output_data['guessed_error_rate'] = guess[1]
+            if repeats:
+                output_data['estimated_q1'] = guess[2]
+                output_data['estimated_q2'] = guess[3]
+                output_data['estimated_q'] = guess[4]
 
-    if use_hillclimb:
-        verbose_print('Starting hillclimbing search with guess: {}'.format(res.x))
-        cov, e = minimize_hillclimbing(
-            likelihood_f, [cov, e],
-            bounds=((0.0, None), (0.0, 1.0)),
-        )
+        if estimated is not None:
+            output_data['estimated_loglikelihood'] = -self.likelihood_f(estimated)
+            output_data['estimated_coverage'] = estimated[0]
+            output_data['estimated_error_rate'] = estimated[1]
+            if repeats:
+                output_data['estimated_q1'] = estimated[2]
+                output_data['estimated_q2'] = estimated[3]
+                output_data['estimated_q'] = estimated[4]
+                if orig_q1 is None:
+                    orig_q1 = estimated[2]
+                if orig_q2 is None:
+                    orig_q2 = estimated[3]
+                if orig_q is None:
+                    orig_q = estimated[4]
 
-    if use_grid:
-        verbose_print('Starting grid search with guess: {}'.format(res.x))
-        cov, e = minimize_grid(
-            likelihood_f, [cov, e], bounds=((0.0, None), (0.0, 1.0))
-        )
+        if orig_error_rate is not None:
+            output_data['original_error_rate'] = orig_error_rate
+        elif estimated:
+            orig_error_rate = estimated[1]
 
-    output_data = {
-        'guessed_coverage': guessed_c,
-        'guessed_error_rate': guessed_e,
-        'guessed_loglikelihood': -likelihood_f(x0),
-        'estimated_error_rate': e,
-        'estimated_coverage': cov,
-        'estimated_loglikelihood': -likelihood_f([cov, e]),
-    }
+        if orig_coverage is not None:
+            if repeats:
+                output_data['original_loglikelihood'] = -self.likelihood_f(
+                    [orig_coverage, orig_error_rate, orig_q1, orig_q2, orig_q]
+                )
+            else:
+                output_data['original_loglikelihood'] = -self.likelihood_f(
+                    [orig_coverage, orig_error_rate]
+                )
 
-    if orig_error_rate is not None:
-        output_data['original_error_rate'] = orig_error_rate
-    else:
-        orig_error_rate = e
+        if not silent:
+            print(json.dumps(
+                output_data, sort_keys=True, indent=4, separators=(',', ': ')
+            ))
 
-    if orig_coverage is not None:
-        output_data['original_loglikelihood'] = -likelihood_f([orig_coverage, orig_error_rate])
-
-    print(json.dumps(
-        output_data, sort_keys=True, indent=4, separators=(',', ': ')
-    ))
-
-    return cov, e
-
-
-@running_time_decorator
-def compute_coverage_repeats(hist, r, k, guessed_c=10, guessed_e=0.05,
-                             guessed_q1=0.5, guessed_q2=0.5, guessed_q=0.5,
-                             orig_error_rate=None, orig_coverage=None,
-                             orig_q1=None, orig_q2=None, orig_q=None,
-                             use_grid=False, use_hillclimb=True):
-
-    likelihood_f = lambda x: -compute_loglikelihood_with_repeats(
-        hist, args.read_length, args.kmer_size, x[0], x[1], x[2], x[3], x[4],
-    )
-    x0 = [guessed_c, guessed_e, guessed_q1, guessed_q2, guessed_q]
-
-    res = minimize(
-        likelihood_f, x0,
-        bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
-        options={'disp': True}
-    )
-    cov, e, q1, q2, q = res.x
-
-    if use_hillclimb:
-        verbose_print('Starting hillclimbing search with guess: {}'.format(res.x))
-        cov, e, q1, q2, q = minimize_hillclimbing(
-            likelihood_f, [cov, e, q1, q2, q],
-            bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
-        )
-
-    if use_grid:
-        verbose_print('Starting grid search with guess: {}'.format(res.x))
-        cov, e, q1, q2, q = minimize_grid(
-            likelihood_f, [cov, e, q1, q2, q],
-            bounds=((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
-        )
-
-    output_data = {
-        'guessed_coverage': guessed_c,
-        'guessed_error_rate': guessed_e,
-        'guessed_loglikelihood': -likelihood_f(x0),
-        'estimated_error_rate': e,
-        'estimated_coverage': cov,
-        'estimated_loglikelihood': -likelihood_f([cov, e, q1, q2, q]),
-        'estimated_q1': q1,
-        'estimated_q2': q2,
-        'estimated_q': q,
-    }
-
-    if orig_error_rate is not None:
-        output_data['original_error_rate'] = orig_error_rate
-    else:
-        orig_error_rate = e
-
-    if orig_q1 is None:
-        orig_q1 = q1
-    if orig_q2 is None:
-        orig_q2 = q2
-    if orig_q is None:
-        orig_q = q
-
-    if orig_coverage is not None:
-        output_data['original_loglikelihood'] = -likelihood_f(
-            [orig_coverage, orig_error_rate, orig_q1, orig_q2, orig_q]
-        )
-
-    print(json.dumps(
-        output_data, sort_keys=True, indent=4, separators=(',', ': ')
-    ))
-
-    return cov, e
-
-
-def plot_probs(r, k, hist, est_c, est_e, guess_c, guess_e, orig_c=None, orig_e=None):
-    hs = float(sum(hist))
-    hp = [f / hs for f in hist]
-    ep_f = compute_probabilities(r, k, est_c, est_e)
-    gp_f = compute_probabilities(r, k, guess_c, guess_e)
-    if orig_c is not None and orig_e is not None:
-        op_f = compute_probabilities(r, k, orig_c, orig_e)
-    else:
-        op_f = lambda _: 0
-    ep = [0] + [ep_f(j) for j in range(1, len(hist))]
-    gp = [0] + [gp_f(j) for j in range(1, len(hist))]
-    op = [0] + [op_f(j) for j in range(1, len(hist))]
-    plt.plot(
-        range(len(hp)), hp, 'ko',
-        label='hist',
-        ms=8,
-    )
-    plt.plot(
-        range(len(ep)), ep, 'ro',
-        label='est: C:{:.3f} E:{:.3f}'.format(est_c, est_e),
-        ms=6,
-    )
-    plt.plot(
-        range(len(gp)), gp, 'go',
-        label='guess: C:{:.3f} E:{:.3f}'.format(guess_c, guess_e),
-        ms=5,
-    )
-    plt.plot(
-        range(len(op)), op, 'co',
-        label='orig: C:{:.3f} E:{:.3f}'.format(orig_c, orig_e),
-        ms=4,
-    )
-    plt.legend()
-    plt.show()
+        return output_data
 
 
 @running_time_decorator
@@ -614,59 +577,62 @@ def minimize_hillclimbing(fn, initial_guess, bounds=None, oprions=None, iteratio
 
 @running_time_decorator
 def main(args):
-    global model
-    model = args.model
     all_kmers, unique_kmers, observed_ones, hist = load_dist(
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
+
+    models = [RepeatsModel, RepeatsModel2, RepeatsModel3]
+    if args.repeats:
+        model_class = models[args.model]
+    else:
+        model_class = BasicModel
+    model = model_class(args.kmer_size, args.read_length, hist)
+
+    orig = [args.coverage, args.error_rate, args.q1, args.q2, args.q]
+    if not args.repeats:
+        orig = orig[:2]
+
     if args.ll_only:
-        if args.repeats:
-            ll = compute_loglikelihood_with_repeats(
-                hist, args.read_length, args.kmer_size,
-                args.coverage, args.error_rate, args.q1, args.q2, args.q
-            )
-        else:
-            ll = compute_loglikelihood(
-                hist, args.read_length, args.kmer_size, args.coverage, args.error_rate,
-            )
+        ll = model.compute_loglikelihood(*orig)
         print('Loglikelihood:', ll)
     else:
         verbose_print('Estimating coverage for {}'.format(args.input_histogram))
         if args.start_original:
             cov, e, q1, q2, q = args.c, args.e, args.q1, args.q2, args.q
         else:
+            # compute guess
             cov, e = compute_coverage_apx(
                 all_kmers, unique_kmers, observed_ones,
                 args.kmer_size, args.read_length
             )
-            q1, q2, q = None, None, None
-        verbose_print('Initial guess: c: {} e: {} ll:{}'.format(cov, e, compute_loglikelihood(
-            hist, args.read_length, args.kmer_size, cov, e
-        )))
+            q1, q2, q = 0.5, 0.5, 0.5
+        if args.repeats:
+            guess = [cov, e, q1, q2, q]
+        else:
+            guess = [cov, e]
 
-        # We were unable to guess cov and e, try to estimate from some fixed valid data instead
+        print(guess)
+        verbose_print('Initial guess: {} ll:{}'.format(
+            guess, model.compute_loglikelihood(*guess)
+        ))
+
+        # We were unable to guess cov and e.
+        # Try to estimate from some fixed valid data instead.
         if cov == 0 and e == 1:
             cov = 1
             e = 0.5
 
-        if args.repeats:
-            cov2, e2 = compute_coverage_repeats(
-                hist, args.read_length, args.kmer_size, cov, e,
-                orig_error_rate=args.error_rate, orig_coverage=args.coverage,
-                orig_q1=q1, orig_q2=q2, orig_q=q,
-                use_grid=args.grid, use_hillclimb=args.hillclimbing,
-            )
-        else:
-            cov2, e2 = compute_coverage(
-                hist, args.read_length, args.kmer_size, cov, e,
-                orig_error_rate=args.error_rate, orig_coverage=args.coverage,
-                use_grid=args.grid, use_hillclimb=args.hillclimbing,
-            )
+        estimator = CoverageEstimator(model)
+        res = estimator.compute_coverage(
+            guess, use_grid=args.grid, use_hillclimb=args.hillclimbing
+        )
+        estimator.print_output(
+            res, guess, args.c, args.e, args.q1, args.q2, args.q, repeats=args.repeats
+        )
 
         if args.plot:
-            plot_probs(
-                args.read_length, args.kmer_size, hist,
-                cov2, e2, cov, e, args.coverage, args.error_rate,
+            model.plot_probs(
+                res, guess, orig,
             )
 
 if __name__ == '__main__':
