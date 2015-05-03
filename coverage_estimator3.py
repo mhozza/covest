@@ -517,14 +517,12 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, options=None,
     grid_depth = 3
     diff = 1
     n_iter = 0
-    verbose_print('Grid size: {}'.format(sum(
-        [1 for _ in generate_grid(min_args, step, grid_depth)]
-    )))
     try:
         while (diff > 0.1 or step > 1.001):
             n_iter += 1
             diff = 0.0
             grid = list(generate_grid(min_args, step, grid_depth))
+            verbose_print('Iter : {}, Grid size: {}'.format(n_iter, len(grid)))
             fn_grid = zip([f] * len(grid), grid)
             with running_time('grid iteration'):
                 with Pool(n_threads) as pool:
@@ -537,7 +535,8 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, options=None,
                     min_args = args
             if diff < 1.0:
                 step = 1 + (step - 1) * 0.75
-            verbose_print('GS_{}: d:{} s:{}'.format(n_iter, diff, step))
+            verbose_print('d:{} s:{}'.format(n_iter, diff, step))
+            verbose_print('New args: {}, ll: {}'.format(min_args, min_val))
     except KeyboardInterrupt:
         verbose_print('Grid search interrupted')
 
