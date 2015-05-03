@@ -499,7 +499,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, options=None,
                     min_args = args
             if diff < 1.0:
                 step = 1 + (step - 1) * 0.75
-            verbose_print('d:{} s:{}'.format(n_iter, diff, step))
+            verbose_print('d:{} s:{}'.format(diff, step))
             verbose_print('New args: {}, ll: {}'.format(min_args, min_val))
     except KeyboardInterrupt:
         verbose_print('Grid search interrupted')
