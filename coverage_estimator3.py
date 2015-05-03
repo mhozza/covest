@@ -385,7 +385,7 @@ class CoverageEstimator:
             # pickle doesn't support lambdas
             r = optimize_grid(
                 self.model.compute_loglikelihood, r, bounds=self.model.bounds,
-                maximize=True
+                maximize=True, n_threads=n_threads,
             )
         return r
 
