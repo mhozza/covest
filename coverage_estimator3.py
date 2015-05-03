@@ -423,6 +423,7 @@ class CoverageEstimator:
                 self.model.compute_loglikelihood, r, bounds=self.model.bounds,
                 maximize=True
             )
+        return r
 
     def print_output(self, estimated=None, guess=None,
                      orig_coverage=None, orig_error_rate=None,
@@ -435,9 +436,9 @@ class CoverageEstimator:
             output_data['guessed_coverage'] = guess[0]
             output_data['guessed_error_rate'] = guess[1]
             if repeats:
-                output_data['estimated_q1'] = guess[2]
-                output_data['estimated_q2'] = guess[3]
-                output_data['estimated_q'] = guess[4]
+                output_data['guessed_q1'] = guess[2]
+                output_data['guessed_q2'] = guess[3]
+                output_data['guessed_q'] = guess[4]
 
         if estimated is not None:
             output_data['estimated_loglikelihood'] = -self.likelihood_f(estimated)
