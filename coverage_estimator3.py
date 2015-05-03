@@ -421,7 +421,7 @@ class CoverageEstimator:
 
         if orig_error_rate is not None:
             output_data['original_error_rate'] = orig_error_rate
-        elif estimated:
+        elif estimated is not None:
             orig_error_rate = estimated[1]
 
         if orig_coverage is not None:
