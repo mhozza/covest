@@ -1,5 +1,6 @@
 import time
 import sys
+from contextlib import contextmanager
 
 stack = list()
 messages = list()
@@ -57,3 +58,11 @@ def running_time_decorator(fn):
         pop(2)
         return ret
     return wrapped
+
+
+@contextmanager
+def running_time(text):
+    push(2)
+    yield
+    msg(text + " took {time} seconds.", 1)
+    pop(2)

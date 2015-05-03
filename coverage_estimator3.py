@@ -2,23 +2,25 @@
 import sys
 import itertools
 from collections import defaultdict
-import scipy.misc
+from scipy.misc import comb
 from scipy.optimize import minimize
 import argparse
 from inverse import inverse
 import matplotlib.pyplot as plt
 import numpy
-from perf import running_time_decorator
+from perf import running_time_decorator, running_time
 from functools import lru_cache
 import json
 import random
 from math import exp, log
+from multiprocessing import Pool
+import pickle
 # from utils import print_wrap as pw
 
 # defaults
 DEFAULT_K = 21
 DEFAULT_READ_LENGTH = 100
-ERROR_RATE = 0.03
+DEFAULT_THREAD_COUNT = 4
 
 # config
 VERBOSE = True
@@ -26,16 +28,6 @@ VERBOSE = True
 INF = float('inf')
 USE_BIGFLOAT = False
 model = 1
-
-
-@lru_cache(maxsize=None)
-def comb(n, k):
-    return scipy.misc.comb(n, k)
-
-
-@lru_cache(maxsize=None)
-def factorial(n):
-    return scipy.misc.factorial(n, exact=True)
 
 
 def verbose_print(message):
@@ -143,13 +135,17 @@ def fix_zero(x, val=1):
 
 
 class BasicModel:
-    def __init__(self, k, r, hist):
+    def __init__(self, k, r, hist, max_error=None):
         self.repeats = False
         self.k = k
         self.r = r
         self.bounds = ((0.0, None), (0.0, 1.0))
         self.comb = [comb(k, s) for s in range(k + 1)]
         self.hist = hist
+        if max_error is None:
+            self.max_error = self.k + 1
+        else:
+            self.max_error = min(self.k + 1, max_error)
         self.factorial = [1]
         for i in range(1, len(hist)):
             t = self.factorial[-1] * i
@@ -181,22 +177,29 @@ class BasicModel:
                 )
                 return 0.0
 
+    @lru_cache(maxsize=None)
+    def get_lambda_s(self, c, err):
+        return [
+            c * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s
+            for s in range(self.max_error)
+        ]
+
     def compute_probabilities(self, c, err, *args):
         # read to kmer coverage
         c = self.correct_c(c)
         # lambda for kmers with s errors
-        l_s = [c * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s for s in range(self.k + 1)]
+        l_s = self.get_lambda_s(c, err)
         # expected probability of kmers with s errors and coverage >= 1
-        n_s = [self.comb[s] * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(self.k + 1)]
-        sum_n_s = fix_zero(sum(n_s[t] for t in range(self.k + 1)))
+        n_s = [self.comb[s] * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(self.max_error)]
+        sum_n_s = fix_zero(sum(n_s[t] for t in range(self.max_error)))
         # portion of kmers with s errors
-        a_s = [n_s[s] / sum_n_s for s in range(self.k + 1)]
+        a_s = [n_s[s] / sum_n_s for s in range(self.max_error)]
         # probability that unique kmer has coverage j (j > 0)
         max_hist = len(self.hist)
         p_j = [None] + [
             sum(
                 a_s[s] * self.tr_poisson(l_s[s], j)
-                for s in range(self.k + 1)
+                for s in range(self.max_error)
             )
             for j in range(1, max_hist)
         ]
@@ -250,8 +253,8 @@ class BasicModel:
 
 
 class RepeatsModel2(BasicModel):
-    def __init__(self, k, r, hist, treshold=1e-8):
-        super(RepeatsModel2, self).__init__(k, r, hist)
+    def __init__(self, k, r, hist, max_error=None, treshold=1e-8):
+        super(RepeatsModel2, self).__init__(k, r, hist, max_error)
         self.repeats = False
         self.bounds = ((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
         self.treshold = treshold
@@ -285,26 +288,26 @@ class RepeatsModel2(BasicModel):
         # read to kmer coverage
         c = self.correct_c(c)
         # lambda for kmers with s errors
-        l_s = [c * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s for s in range(self.k + 1)]
+        l_s = self.get_lambda_s(c, err)
         # expected probability of kmers with s errors and coverage >= 1
         n_os = [None] + [
-            [self.comb[s] * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(self.k + 1)]
+            [self.comb[s] * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(self.max_error)]
             for o in range(1, treshold_o)
         ]
         sum_n_os = [None] + [
-            fix_zero(sum(n_os[o][t] for t in range(self.k + 1))) for o in range(1, treshold_o)
+            fix_zero(sum(n_os[o][t] for t in range(self.max_error))) for o in range(1, treshold_o)
         ]
 
         # portion of kmers wit1h s errors
         a_os = [None] + [
-            [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(self.k + 1)]
+            [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(self.max_error)]
             for o in range(1, treshold_o)
         ]
         # probability that unique kmer has coverage j (j > 0)
         p_j = [None] + [
             sum(
                 b_o(o) * sum(
-                    a_os[o][s] * self.tr_poisson(o * l_s[s], j) for s in range(self.k + 1)
+                    a_os[o][s] * self.tr_poisson(o * l_s[s], j) for s in range(self.max_error)
                 )
                 for o in range(1, min(j + 1, treshold_o))
             )
@@ -320,27 +323,26 @@ class RepeatsModel3(RepeatsModel2):
         # read to kmer coverage
         c = self.correct_c(c)
         # lambda for kmers with s errors
-        l_os = [
+        l_s = self.get_lambda_s(c, err)
+        # expected probability of kmers with s errors and coverage >= 1
+        n_os = [
             [
-                b_o(o) * o * c * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s
-                for s in range(self.k + 1)
+                self.comb[s] * (3 ** s) * (1.0 - exp(b_o(o) * o * -l_s[s]))
+                for s in range(self.max_error)
             ]
             for o in range(treshold_o)
         ]
-        # expected probability of kmers with s errors and coverage >= 1
-        n_os = [
-            [self.comb[s] * (3 ** s) * (1.0 - exp(-l_os[o][s])) for s in range(self.k + 1)]
-            for o in range(treshold_o)
-        ]
-        sum_n_os = fix_zero(sum(n_os[o][s] for s in range(self.k + 1) for o in range(treshold_o)))
+        sum_n_os = fix_zero(sum(
+            n_os[o][s] for s in range(self.max_error) for o in range(treshold_o)
+        ))
 
         # portion of kmers with s errors
-        a_os = [[n_os[o][s] / sum_n_os for s in range(self.k + 1)] for o in range(treshold_o)]
+        a_os = [[n_os[o][s] / sum_n_os for s in range(self.max_error)] for o in range(treshold_o)]
         # probability that unique kmer has coverage j (j > 0)
 
         p_j = [None] + [
             sum(
-                a_os[o][s] * self.tr_poisson(l_os[o][s], j) for s in range(self.k + 1)
+                a_os[o][s] * self.tr_poisson(b_o(o) * o * l_s[s], j) for s in range(self.max_error)
                 for o in range(
                     1, min(j + 1, treshold_o) if treshold_o is not None else j + 1
                 )
@@ -351,7 +353,7 @@ class RepeatsModel3(RepeatsModel2):
 
 
 class RepeatsModel(RepeatsModel2):
-    @lru_cache(maxsize=100)
+    @lru_cache(maxsize=None)
     def compute_repeat_table(self, c, err, treshold_o):
         p_j = super(BasicModel, self).compute_probabilities(c, err)
         p_oj = [
@@ -397,25 +399,29 @@ class CoverageEstimator:
         self.model = model
         self.likelihood_f = lambda x: -self.model.compute_loglikelihood(*x)
 
-    def compute_coverage(self, guess, use_grid=False, use_hillclimb=False):
+    def compute_coverage(self, guess, use_grid=False, use_hillclimb=False, n_threads=1):
+        r = guess
         res = minimize(
-            self.likelihood_f, guess,
+            self.likelihood_f, r,
             bounds=self.model.bounds,
             options={'disp': True}
         )
         r = res.x
 
         if use_hillclimb:
-            verbose_print('Starting hillclimbing search with guess: {}'.format(res.x))
+            verbose_print('Starting hillclimbing search with guess: {}'.format(r))
             r = minimize_hillclimbing(
                 self.likelihood_f, r,
                 bounds=self.model.bounds,
             )
 
         if use_grid:
-            verbose_print('Starting grid search with guess: {}'.format(res.x))
-            r = minimize_grid(
-                self.likelihood_f, r, bounds=self.model.bounds
+            verbose_print('Starting grid search with guess: {}'.format(r))
+            # we cannot use lambda as fn parameter due to multithreading
+            # pickle doesn't support lambdas
+            r = optimize_grid(
+                self.model.compute_loglikelihood, r, bounds=self.model.bounds,
+                maximize=True
             )
 
     def print_output(self, estimated=None, guess=None,
@@ -471,8 +477,15 @@ class CoverageEstimator:
         return output_data
 
 
+def unpack_call(args):
+    f, data = args
+    f = pickle.loads(f)
+    return f(*data)
+
+
 @running_time_decorator
-def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
+def optimize_grid(fn, initial_guess, bounds=None, maximize=False, options=None,
+                  n_threads=DEFAULT_THREAD_COUNT):
     def generate_grid(args, step, max_depth):
         def generate_grid_single(var):
             return (
@@ -495,7 +508,9 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
         ]
         return itertools.product(*var_grids)
 
-    min_val = fn(initial_guess)
+    sgn = -1 if maximize else 1
+    f = pickle.dumps(fn, pickle.HIGHEST_PROTOCOL)
+    min_val = sgn * unpack_call([f, initial_guess])
     min_args = initial_guess
     step = 1.1
     grid_depth = 3
@@ -508,11 +523,16 @@ def minimize_grid(fn, initial_guess, bounds=None, oprions=None):
         while (diff > 0.1 or step > 1.001):
             n_iter += 1
             diff = 0.0
-            for args in generate_grid(min_args, step, grid_depth):
-                val = fn(args)
-                if val < min_val:
+            grid = list(generate_grid(min_args, step, grid_depth))
+            fn_grid = zip([f] * len(grid), grid)
+            with running_time('grid iteration'):
+                with Pool(n_threads) as pool:
+                    res = pool.map(unpack_call, fn_grid)
+            for args, val in zip(grid, res):
+                # val = fn(args)
+                if sgn * val < min_val:
                     diff += min_val - val
-                    min_val = val
+                    min_val = sgn * val
                     min_args = args
             if diff < 1.0:
                 step = 1 + (step - 1) * 0.75
@@ -586,7 +606,7 @@ def main(args):
         model_class = models[args.model]
     else:
         model_class = BasicModel
-    model = model_class(args.kmer_size, args.read_length, hist)
+    model = model_class(args.kmer_size, args.read_length, hist, max_error=8)
 
     orig = [args.coverage, args.error_rate, args.q1, args.q2, args.q]
     if not args.repeats:
@@ -624,10 +644,12 @@ def main(args):
 
         estimator = CoverageEstimator(model)
         res = estimator.compute_coverage(
-            guess, use_grid=args.grid, use_hillclimb=args.hillclimbing
+            guess, use_grid=args.grid, use_hillclimb=args.hillclimbing,
+            n_threads=args.thread_count
         )
         estimator.print_output(
-            res, guess, args.c, args.e, args.q1, args.q2, args.q, repeats=args.repeats
+            res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
+            repeats=args.repeats,
         )
 
         if args.plot:
@@ -662,6 +684,8 @@ if __name__ == '__main__':
                         help='Start form given values')
     parser.add_argument('-m', '--model', default=1, type=int,
                         help='Model to use for estimation')
+    parser.add_argument('-T', '--thread-count', default=DEFAULT_THREAD_COUNT, type=int,
+                        help='Thread count')
 
     args = parser.parse_args()
     main(args)
