@@ -347,10 +347,7 @@ class RepeatsModel(RepeatsModel2):
         p_j = [0] + [
             sum(
                 b_o(o) * p_oj[o][j]
-                for o in range(
-                    1,
-                    min(j + 1, treshold_o) if treshold_o is not None else j + 1
-                )
+                for o in range(1, treshold_o)
             )
             for j in range(1, len(self.hist))
         ]
@@ -384,9 +381,7 @@ class RepeatsModel3(RepeatsModel2):
         p_j = [None] + [
             sum(
                 a_os[o][s] * self.tr_poisson(b_o(o) * o * l_s[s], j) for s in range(self.max_error)
-                for o in range(
-                    1, treshold_o
-                )
+                for o in range(1, treshold_o)
             )
             for j in range(1, len(self.hist))
         ]
