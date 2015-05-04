@@ -262,7 +262,7 @@ class RepeatsModel2(BasicModel):
         hist_size = len(self.hist)
         if treshold is not None:
             for o in range(1, hist_size):
-                if b_o(o) < treshold:
+                if b_o(o) <= treshold:
                     return o
         return hist_size
 
@@ -308,7 +308,7 @@ class RepeatsModel2(BasicModel):
                 b_o(o) * sum(
                     a_os[o][s] * self.tr_poisson(o * l_s[s], j) for s in range(self.max_error)
                 )
-                for o in range(1, min(j + 1, treshold_o))
+                for o in range(1, treshold_o)
             )
             for j in range(1, len(self.hist))
         ]
@@ -385,7 +385,7 @@ class RepeatsModel3(RepeatsModel2):
             sum(
                 a_os[o][s] * self.tr_poisson(b_o(o) * o * l_s[s], j) for s in range(self.max_error)
                 for o in range(
-                    1, min(j + 1, treshold_o) if treshold_o is not None else j + 1
+                    1, treshold_o
                 )
             )
             for j in range(1, len(self.hist))
