@@ -11,7 +11,6 @@ import numpy
 from perf import running_time_decorator, running_time
 from functools import lru_cache
 import json
-import random
 from math import exp, log
 from multiprocessing import Pool
 import pickle
@@ -218,7 +217,7 @@ class BasicModel:
 
     def plot_probs(self, est, guess, orig):
         def fmt(p):
-            print(['{:.3f}'.format(x) for x in p[1:20]])
+            return ['{:.3f}'.format(x) for x in p[:20]]
 
         hs = float(sum(self.hist))
         hp = [f / hs for f in self.hist]
@@ -363,7 +362,7 @@ class CoverageEstimator:
         self.model = model
         self.likelihood_f = lambda x: -self.model.compute_loglikelihood(*x)
 
-    def compute_coverage(self, guess, use_grid=False, use_hillclimb=False, n_threads=1):
+    def compute_coverage(self, guess, use_grid=False, n_threads=1):
         r = guess
         res = minimize(
             self.likelihood_f, r,
@@ -371,13 +370,6 @@ class CoverageEstimator:
             options={'disp': True}
         )
         r = res.x
-
-        if use_hillclimb:
-            verbose_print('Starting hillclimbing search with guess: {}'.format(r))
-            r = minimize_hillclimbing(
-                self.likelihood_f, r,
-                bounds=self.model.bounds,
-            )
 
         if use_grid:
             verbose_print('Starting grid search with guess: {}'.format(r))
@@ -509,57 +501,6 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, options=None,
 
 
 @running_time_decorator
-def minimize_hillclimbing(fn, initial_guess, bounds=None, oprions=None, iterations=1000):
-    def generate_grid(args, step, max_depth):
-        def generate_grid_single(var):
-            return (
-                var * step ** d
-                for d in range(-max_depth, max_depth + 1) if d != 0
-            )
-
-        def filter_bounds(var_grid, i):
-            if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
-                return var_grid
-            low, high = bounds[i]
-            return (
-                var for var in var_grid
-                if (low is None or var >= low) and (high is None or var <= high)
-            )
-
-        r = random.randrange(len(args))
-        var_grids = [
-            list(filter_bounds(generate_grid_single(var), i)) if i == r else [args[i]]
-            for i, var in enumerate(args)
-        ]
-        return itertools.product(*var_grids)
-
-    min_val = fn(initial_guess)
-    min_args = initial_guess
-    step = 1.1
-    grid_depth = 3
-    n_iter = 0
-    verbose_print('Grid size: {}'.format(sum(
-        [1 for _ in generate_grid(min_args, step, grid_depth)]
-    )))
-    try:
-        while n_iter < iterations:
-            modified = False
-            n_iter += 1
-            for args in generate_grid(min_args, step, grid_depth):
-                val = fn(args)
-                if val < min_val:
-                    modified = True
-                    min_val = val
-                    min_args = args
-            verbose_print('HC_{} m:{}'.format(n_iter, modified))
-    except KeyboardInterrupt:
-        verbose_print('Hill climb search interrupted')
-
-    verbose_print('Number of iterations in grid search:{}'.format(n_iter))
-    return min_args
-
-
-@running_time_decorator
 def main(args):
     all_kmers, unique_kmers, observed_ones, hist = load_dist(
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
@@ -608,8 +549,7 @@ def main(args):
 
         estimator = CoverageEstimator(model)
         res = estimator.compute_coverage(
-            guess, use_grid=args.grid, use_hillclimb=args.hillclimbing,
-            n_threads=args.thread_count
+            guess, use_grid=args.grid, n_threads=args.thread_count
         )
         estimator.print_output(
             res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
@@ -637,8 +577,6 @@ if __name__ == '__main__':
                         help='Trim histogram at this value')
     parser.add_argument('-g', '--grid', action='store_true', default=False,
                         help='Use grid search')
-    parser.add_argument('-hc', '--hillclimbing', action='store_true', default=False,
-                        help='Use hill climbing')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('-q1', type=float, help='q1')
