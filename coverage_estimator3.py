@@ -358,16 +358,20 @@ class RepeatsModel(RepeatsModel2):
 
 
 class CoverageEstimator:
-    def __init__(self, model, *args, **kwargs):
+    def __init__(self, model, fix=None):
         self.model = model
-        self.likelihood_f = lambda x: -self.model.compute_loglikelihood(*x)
+        self.fix = fix
+
+    def likelihood_f(self, x):
+        if self.fix is not None:
+            x = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(x)]
+        return -self.model.compute_loglikelihood(*x)
 
     def compute_coverage(self, guess, use_grid=False, n_threads=1):
         r = guess
         res = minimize(
             self.likelihood_f, r,
             bounds=self.model.bounds,
-            options={'disp': True}
         )
         r = res.x
 
@@ -376,8 +380,8 @@ class CoverageEstimator:
             # we cannot use lambda as fn parameter due to multithreading
             # pickle doesn't support lambdas
             r = optimize_grid(
-                self.model.compute_loglikelihood, r, bounds=self.model.bounds,
-                maximize=True, n_threads=n_threads,
+                self.likelihood_f, r, bounds=self.model.bounds,
+                fix=self.fix, n_threads=n_threads,
             )
         return r
 
@@ -437,18 +441,21 @@ class CoverageEstimator:
 def unpack_call(args):
     f, data = args
     f = pickle.loads(f)
-    return f(*data)
+    return f(data)
 
 
 @running_time_decorator
-def optimize_grid(fn, initial_guess, bounds=None, maximize=False, options=None,
-                  n_threads=DEFAULT_THREAD_COUNT):
+def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
+                  options=None, n_threads=DEFAULT_THREAD_COUNT):
     def generate_grid(args, step, max_depth):
-        def generate_grid_single(var):
-            return (
-                var * step ** d
-                for d in range(-max_depth, max_depth + 1) if d != 0
-            )
+        def generate_grid_single(var, fix=None):
+            if fix is None:
+                return (
+                    var * step ** d
+                    for d in range(-max_depth, max_depth + 1) if d != 0
+                )
+            else:
+                return [fix]
 
         def filter_bounds(var_grid, i):
             if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
@@ -460,11 +467,13 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, options=None,
             )
 
         var_grids = [
-            list(filter_bounds(generate_grid_single(var), i))
+            list(filter_bounds(generate_grid_single(var, fix[i]), i))
             for i, var in enumerate(args)
         ]
         return itertools.product(*var_grids)
 
+    if fix is None:
+        fix = [None] * len(initial_guess)
     sgn = -1 if maximize else 1
     f = pickle.dumps(fn, pickle.HIGHEST_PROTOCOL)
     min_val = sgn * unpack_call([f, initial_guess])
@@ -547,7 +556,8 @@ def main(args):
             cov = 1
             e = 0.5
 
-        estimator = CoverageEstimator(model)
+        fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
+        estimator = CoverageEstimator(model, fix)
         res = estimator.compute_coverage(
             guess, use_grid=args.grid, n_threads=args.thread_count
         )
@@ -584,6 +594,8 @@ if __name__ == '__main__':
     parser.add_argument('-q', type=float, help='q')
     parser.add_argument('-so', '--start-original', action='store_true',
                         help='Start form given values')
+    parser.add_argument('--fix', action='store_true',
+                        help='Fix some vars, optimize others')
     parser.add_argument('-m', '--model', default=1, type=int,
                         help='Model to use for estimation')
     parser.add_argument('-T', '--thread-count', default=DEFAULT_THREAD_COUNT, type=int,
