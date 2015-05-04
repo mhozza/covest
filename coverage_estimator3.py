@@ -357,6 +357,42 @@ class RepeatsModel(RepeatsModel2):
         return p_j
 
 
+class RepeatsModel3(RepeatsModel2):
+    def compute_probabilities_with_repeats3(self, c, err, q1, q2, q):
+        b_o = self.get_b_o(q1, q2, q)
+        treshold_o = self.get_hist_treshold(b_o, self.treshold)
+        # read to kmer coverage
+        c = self.correct_c(c)
+        # lambda for kmers with s errors
+        l_s = self.get_lambda_s(c, err)
+        # expected probability of kmers with s errors and coverage >= 1
+        n_os = [
+            [
+                self.comb[s] * (3 ** s) * (1.0 - exp(b_o(o) * o * -l_s[s]))
+                for s in range(self.max_error)
+            ]
+            for o in range(treshold_o)
+        ]
+        sum_n_os = fix_zero(sum(
+            n_os[o][s] for s in range(self.max_error) for o in range(treshold_o)
+        ))
+
+        # portion of kmers with s errors
+        a_os = [[n_os[o][s] / sum_n_os for s in range(self.max_error)] for o in range(treshold_o)]
+        # probability that unique kmer has coverage j (j > 0)
+
+        p_j = [None] + [
+            sum(
+                a_os[o][s] * self.tr_poisson(b_o(o) * o * l_s[s], j) for s in range(self.max_error)
+                for o in range(
+                    1, min(j + 1, treshold_o) if treshold_o is not None else j + 1
+                )
+            )
+            for j in range(1, len(self.hist))
+        ]
+        return p_j
+
+
 class CoverageEstimator:
     def __init__(self, model, fix=None):
         self.model = model
@@ -515,7 +551,7 @@ def main(args):
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
 
-    models = [RepeatsModel, RepeatsModel2]
+    models = [RepeatsModel, RepeatsModel2, RepeatsModel3]
     if args.repeats:
         model_class = models[args.model]
     else:
