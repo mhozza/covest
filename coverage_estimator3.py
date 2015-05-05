@@ -339,7 +339,7 @@ class RepeatsModel(RepeatsModel2):
 
         return p_oj
 
-    def compute_probabilities_with_repeats(self, c, err, q1, q2, q):
+    def compute_probabilities(self, c, err, q1, q2, q):
         b_o = self.get_b_o(q1, q2, q)
         treshold_o = self.get_hist_treshold(b_o, self.treshold)
         p_oj = self.compute_repeat_table(c, err, treshold_o)
@@ -355,7 +355,7 @@ class RepeatsModel(RepeatsModel2):
 
 
 class RepeatsModel3(RepeatsModel2):
-    def compute_probabilities_with_repeats3(self, c, err, q1, q2, q):
+    def compute_probabilities(self, c, err, q1, q2, q):
         b_o = self.get_b_o(q1, q2, q)
         treshold_o = self.get_hist_treshold(b_o, self.treshold)
         # read to kmer coverage
