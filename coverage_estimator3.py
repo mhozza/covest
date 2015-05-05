@@ -575,8 +575,7 @@ def main(args):
                     cov = args.coverage
                 if args.error_rate is not None:
                     e = args.error_rate
-                q1, q2, q = [args.q1, args.q2, args.q]
-            [q1, q2, q] = [0.5 if i is None else i for i in [q1, q2, q]]
+            q1, q2, q = [0.5 if i is None else i for i in [args.q1, args.q2, args.q]]
         if args.repeats:
             guess = [cov, e, q1, q2, q]
         else:
