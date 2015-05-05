@@ -570,7 +570,13 @@ def main(args):
                 all_kmers, unique_kmers, observed_ones,
                 args.kmer_size, args.read_length
             )
-            q1, q2, q = 0.5, 0.5, 0.5
+            if args.fix:
+                if args.coverage is not None:
+                    cov = args.coverage
+                if args.error_rate is not None:
+                    e = args.error_rate
+                q1, q2, q = [args.q1, args.q2, args.q]
+            [q1, q2, q] = [0.5 if i is None else i for i in [q1, q2, q]]
         if args.repeats:
             guess = [cov, e, q1, q2, q]
         else:
@@ -627,7 +633,7 @@ if __name__ == '__main__':
                         help='Start form given values')
     parser.add_argument('--fix', action='store_true',
                         help='Fix some vars, optimize others')
-    parser.add_argument('-m', '--model', default=1, type=int,
+    parser.add_argument('-m', '--model', default=0, type=int,
                         help='Model to use for estimation')
     parser.add_argument('-T', '--thread-count', default=DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
