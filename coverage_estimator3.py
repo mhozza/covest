@@ -318,7 +318,7 @@ class RepeatsModel2(BasicModel):
 class RepeatsModel(RepeatsModel2):
     @lru_cache(maxsize=None)
     def compute_repeat_table(self, c, err, treshold_o):
-        p_j = super(BasicModel, self).compute_probabilities(c, err)
+        p_j = super(RepeatsModel2, self).compute_probabilities(c, err)
         p_oj = [
             [None], p_j
         ]
