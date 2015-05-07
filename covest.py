@@ -20,6 +20,7 @@ import pickle
 DEFAULT_K = 21
 DEFAULT_READ_LENGTH = 100
 DEFAULT_THREAD_COUNT = 4
+DEFAULT_REPEAT_MODEL = 1
 
 # config
 VERBOSE = True
@@ -347,7 +348,7 @@ class RepeatsModel(RepeatsModel2):
         p_j = [0] + [
             sum(
                 b_o(o) * p_oj[o][j]
-                for o in range(1, treshold_o)
+                for o in range(1, min(j + 1, treshold_o))
             )
             for j in range(1, len(self.hist))
         ]
@@ -582,7 +583,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--read-length', type=int,
                         default=DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('--plot', action='store_true', help='Plot probabilities')
-    parser.add_argument('-rp', '--repeats', action='store_true', help='Estimate vith repeats')
+    parser.add_argument('-rp', '--repeats', action='store_true', help='Estimate with repeats')
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
@@ -599,7 +600,7 @@ if __name__ == '__main__':
                         help='Start form given values')
     parser.add_argument('--fix', action='store_true',
                         help='Fix some vars, optimize others')
-    parser.add_argument('-m', '--model', default=0, type=int,
+    parser.add_argument('-m', '--model', default=DEFAULT_REPEAT_MODEL, type=int,
                         help='Model to use for estimation')
     parser.add_argument('-T', '--thread-count', default=DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')

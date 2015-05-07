@@ -5,7 +5,7 @@ from copy import deepcopy
 
 simulator = './simulator.py {infile_base}.fa -e {error} -c {cov} -f {infile_base_ef}.fa'
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o table.jf'
-jellyfish_hist = 'jellyfish histo table.jf_0 -o {infile_base}_k{k}.dist'
+jellyfish_hist = 'jellyfish histo table.jf -o {infile_base}_k{k}.dist'
 khmer_count = './khmer/scripts/load-into-counting.py -x 1e9'\
               ' -k {k} hash_table.kh {infile_base}.fa'
 khmer_hist = './khmer/scripts/abundance-dist.py'\
@@ -13,7 +13,7 @@ khmer_hist = './khmer/scripts/abundance-dist.py'\
 khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genome-size.py'\
             ' {infile_base}.fa {infile_base}_k{k}.dist {khmer_cov}'
 # estimator = './coverage_estimator2.py {infile_base}_k{k}.dist -e {error} -k {k}'
-estimator = './coverage_estimator3.py {infile_base}_k{k}.dist -e {error} -k {k} -c {cov}'
+estimator = './covest.py {infile_base}_k{k}.dist -e {error} -k {k} -c {cov}'
 
 path = 'experiment2_3'
 

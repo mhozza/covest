@@ -17,12 +17,13 @@ khmer_hist = './khmer/scripts/abundance-dist.py'\
              ' hash_table.kh {infile} {infile_base}_k{k}.dist'
 khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genome-size.py'\
             ' {infile} {infile_base}_k{k}.dist {khmer_cov}'
-estimator = './coverage_estimator3.py {infile_base}_k{k}.dist -k {k} -at 6'
-estimator_r = './coverage_estimator3.py {infile_base}_k{k}.dist -k {k} --rp -at6'
+estimator = './covest.py {infile_base}_k{k}.dist -k {k} -at 6'
+estimator_r = './covest.py {infile_base}_k{k}.dist -k {k} --rp -at6'
 
 path = 'experiment2p'
 
-coverages = [0.5, 1, 2, 4, 10, 30]
+# coverages = [0.5, 1, 2, 4, 10, 30]
+coverages = [4, 10]
 ks = [21]
 
 generate = False
