@@ -15,7 +15,7 @@ khmer_hist = './khmer/scripts/abundance-dist.py'\
 khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genome-size.py'\
             ' {infile_base}.fa {infile_base}_k{k}.dist {khmer_cov}'
 # estimator = './coverage_estimator2.py {infile_base}_k{k}.dist -e {error} -k {k}'
-estimator = './covest.py {infile_base}_k{k}.dist -e {error} -k {k} -c {cov}'
+estimator = './covest.py {infile_base}_k{k}.dist -g -t 100 -T 16 -e {error} -k {k} -c {cov}'
 
 path = 'experiment3_1'
 
