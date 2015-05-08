@@ -14,6 +14,7 @@ import json
 from math import exp, log
 from multiprocessing import Pool
 import pickle
+from os import path
 # from utils import print_wrap as pw
 
 # defaults
@@ -27,7 +28,6 @@ VERBOSE = True
 # INF = 1e100
 INF = float('inf')
 USE_BIGFLOAT = False
-model = 1
 
 
 def verbose_print(message):
@@ -90,6 +90,16 @@ def load_dist(fname, autotrim=None, trim=None):
     elif trim is not None:
         hist_l = hist_l[:trim]
     return all_kmers, unique_kmers, observed_ones, hist_l
+
+
+def count_reads(fname):
+    from Bio import SeqIO
+    _, ext = path.splitext(fname)
+    fmt = 'fasta'
+    if ext == '.fq' or ext == '.fastq':
+        fmt = 'fastq'
+    with open(fname, "rU") as f:
+        return sum(1 for read in SeqIO.parse(f, fmt))
 
 
 def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
@@ -365,7 +375,7 @@ class CoverageEstimator:
             x = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(x)]
         return -self.model.compute_loglikelihood(*x)
 
-    def compute_coverage(self, guess, use_grid=False, n_threads=1):
+    def compute_coverage(self, guess, use_grid=True, n_threads=1):
         r = guess
         res = minimize(
             self.likelihood_f, r,
@@ -375,8 +385,6 @@ class CoverageEstimator:
 
         if use_grid:
             verbose_print('Starting grid search with guess: {}'.format(r))
-            # we cannot use lambda as fn parameter due to multithreading
-            # pickle doesn't support lambdas
             r = optimize_grid(
                 self.likelihood_f, r, bounds=self.model.bounds,
                 fix=self.fix, n_threads=n_threads,
@@ -386,7 +394,7 @@ class CoverageEstimator:
     def print_output(self, estimated=None, guess=None,
                      orig_coverage=None, orig_error_rate=None,
                      orig_q1=None, orig_q2=None, orig_q=None,
-                     repeats=False, silent=False):
+                     repeats=False, silent=False, read_count=None):
         output_data = dict()
         output_data['model'] = self.model.__class__.__name__
 
@@ -413,6 +421,8 @@ class CoverageEstimator:
                     orig_q2 = estimated[3]
                 if orig_q is None:
                     orig_q = estimated[4]
+            if read_count is not None:
+                output_data['genome_size'] = read_count / estimated[0]
 
         if orig_error_rate is not None:
             output_data['original_error_rate'] = orig_error_rate
@@ -565,15 +575,21 @@ def main(args):
         res = estimator.compute_coverage(
             guess, use_grid=args.grid, n_threads=args.thread_count
         )
+        read_count = None
+        if args.genome_size is not None:
+            # genome_size contains read file name
+            read_count = count_reads(args.genome_size)
+
         estimator.print_output(
             res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
-            repeats=args.repeats,
+            repeats=args.repeats, read_count=read_count,
         )
 
         if args.plot:
             model.plot_probs(
                 res, guess, orig,
             )
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
@@ -598,12 +614,13 @@ if __name__ == '__main__':
     parser.add_argument('-q', type=float, help='q')
     parser.add_argument('-so', '--start-original', action='store_true',
                         help='Start form given values')
-    parser.add_argument('--fix', action='store_true',
+    parser.add_argument('-f', '--fix', action='store_true',
                         help='Fix some vars, optimize others')
     parser.add_argument('-m', '--model', default=DEFAULT_REPEAT_MODEL, type=int,
                         help='Model to use for estimation')
     parser.add_argument('-T', '--thread-count', default=DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
+    parser.add_argument('-s', '--genome-size', help='Calculate genome size from reads')
 
     args = parser.parse_args()
     main(args)
