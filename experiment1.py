@@ -52,12 +52,8 @@ if __name__ == '__main__':
                     'cov': c,
                     'khmer_cov': max(1, int(c)),
                 }
-                infile_base = os.path.join(
-                    path, '{seq_name}_c{cov}_e{error}'.format(**params)
-                )
-                infile_base_ef = os.path.join(
-                    path, '{seq_name}_c{cov}_f{error}'.format(**params)
-                )
+                infile_base = '{seq_name}_c{cov}_e{error}'.format(**params)
+                infile_base_ef = '{seq_name}_c{cov}_f{error}'.format(**params)
                 params['infile_base'] = infile_base
                 params['infile_base_ef'] = infile_base_ef
                 if generate:
