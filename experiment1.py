@@ -1,10 +1,12 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 import os
 import subprocess
 from copy import deepcopy
 
-simulator = './simulator.py {infile_base}.fa -e {error} -c {cov} -f {infile_base_ef}.fa'
-jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o table.jf'
+generator = './generate_sequence.py {path}/simulated.fa'
+simulator = './read_simulator.py {path}/simulated.fa {infile_base}.fa'\
+            ' -f {infile_base_ef}.fa -e {error} -c {cov}'
+jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile_base}.fa -o table.jf'
 jellyfish_hist = 'jellyfish histo table.jf -o {infile_base}_k{k}.dist'
 khmer_count = './khmer/scripts/load-into-counting.py -x 1e9'\
               ' -k {k} hash_table.kh {infile_base}.fa'
@@ -15,30 +17,33 @@ khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genom
 # estimator = './coverage_estimator2.py {infile_base}_k{k}.dist -e {error} -k {k}'
 estimator = './covest.py {infile_base}_k{k}.dist -e {error} -k {k} -c {cov}'
 
-path = 'experiment2_3'
+path = 'experiment3_1'
 
 error_rates = [0.01, 0.03, 0.05, 0.1]
-# error_rates = [0.05, 0.1]
-coverages = [0.1, 0.5, 1, 2, 4, 10, 30, 50]
-# coverages = [0.1, .5]
+coverages = [0.1, 0.5, 1, 2, 4, 10, 50]
 ks = [21]
 
-generate = False
+generate = True
 compute_hist = True
 run_khmer = False
 use_jellyfish = True
+VERBOSE = False
 
 
 def run(command, output=None):
+    if VERBOSE:
+        print('running command:', command)
     f = None
     if output:
         f = open(output, 'w')
     return subprocess.call(command.split(), stdout=f)
 
 if __name__ == '__main__':
+    run(generator.format(path=path))
     for c in coverages:
         for e in error_rates:
             params = {
+                'path': path,
                 'error': e,
                 'cov': c,
                 'khmer_cov': max(1, int(c)),
@@ -52,6 +57,7 @@ if __name__ == '__main__':
             params['infile_base'] = infile_base
             params['infile_base_ef'] = infile_base_ef
             if generate:
+                run(simulator.format(**params))
                 run(simulator.format(**params))
             for k in ks:
                 params['k'] = k

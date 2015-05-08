@@ -1,10 +1,12 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 import random
 import argparse
+from os import path
+from Bio import SeqIO
+
 
 BASES = ['A', 'C', 'G', 'T', ]
 
-DEFAULT_GENOME_SIZE = 10 ** 6
 DEFAULT_COVERAGE = 10
 DEFAULT_ERROR_RATE = .03
 DEFAULT_READ_LENGTH = 100
@@ -27,8 +29,20 @@ def reverse_complement(seq):
     return ''.join(complement[x] for x in reversed(seq))
 
 
-def main(fname, genome_size, read_length, error_rate, read_count, error_free_fname=None):
-    genome = ''.join(random.choice(BASES) for _ in range(genome_size))
+def load_reads(fname):
+    _, ext = path.splitext(fname)
+    fmt = 'fasta'
+    if ext == '.fq' or ext == '.fastq':
+        fmt = 'fastq'
+    with open(fname, "rU") as f:
+        for read in SeqIO.parse(f, fmt):
+            yield read.seq
+
+
+def main(fname, genome_file, read_length, error_rate, coverage, error_free_fname=None):
+    genome = list(load_reads(genome_file))[0]
+    genome_size = len(genome)
+    read_count = int(round((coverage * genome_size) / float(read_length)))
     with open(fname, 'w') as f:
         if error_free_fname:
             eff = open(error_free_fname, 'w')
@@ -52,8 +66,6 @@ def main(fname, genome_size, read_length, error_rate, read_count, error_free_fna
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
-    parser.add_argument('-g', '--genome-size', type=int,
-                        default=DEFAULT_GENOME_SIZE, help='Genome size')
     parser.add_argument('-c', '--coverage', type=float,
                         default=DEFAULT_COVERAGE, help='Coverage')
     parser.add_argument('-e', '--error-rate', type=float,
@@ -61,10 +73,10 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--read-length', type=int,
                         default=DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('-f', '--error-free', help='Error free output file')
+    parser.add_argument('genome', help='Genome file')
     parser.add_argument('output', help='Output file')
 
     args = parser.parse_args()
 
-    read_count = int(round((args.coverage * args.genome_size) / float(args.read_length)))
-    main(args.output, args.genome_size, args.read_length, args.error_rate,
-         read_count, args.error_free)
+    main(args.output, args.genome, args.read_length, args.error_rate,
+         args.coverage, args.error_free)
