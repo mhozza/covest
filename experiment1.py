@@ -3,8 +3,8 @@ import os
 import subprocess
 from copy import deepcopy
 
-generator = './generate_sequence.py {path}/simulated.fa'
-simulator = './read_simulator.py {path}/simulated.fa {infile_base}.fa'\
+generator = './generate_sequence.py {seq_name}'
+simulator = './read_simulator.py {seq_name} {infile_base}.fa'\
             ' -f {infile_base_ef}.fa -e {error} -c {cov}'
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile_base}.fa -o table.jf'
 jellyfish_hist = 'jellyfish histo table.jf -o {infile_base}_k{k}.dist'
@@ -19,6 +19,7 @@ estimator = './covest.py {infile_base}_k{k}.dist -e {error} -k {k} -c {cov}'
 
 path = 'experiment3_1'
 
+seq_cnt = 5
 error_rates = [0.01, 0.03, 0.05, 0.1]
 coverages = [0.1, 0.5, 1, 2, 4, 10, 50]
 ks = [21]
@@ -27,7 +28,7 @@ generate = True
 compute_hist = True
 run_khmer = False
 use_jellyfish = True
-VERBOSE = False
+VERBOSE = True
 
 
 def run(command, output=None):
@@ -38,41 +39,44 @@ def run(command, output=None):
         f = open(output, 'w')
     return subprocess.call(command.split(), stdout=f)
 
+
 if __name__ == '__main__':
-    run(generator.format(path=path))
-    for c in coverages:
-        for e in error_rates:
-            params = {
-                'path': path,
-                'error': e,
-                'cov': c,
-                'khmer_cov': max(1, int(c)),
-            }
-            infile_base = os.path.join(
-                path, 'experiment1_c{cov}_e{error}'.format(**params)
-            )
-            infile_base_ef = os.path.join(
-                path, 'experiment1_c{cov}_f{error}'.format(**params)
-            )
-            params['infile_base'] = infile_base
-            params['infile_base_ef'] = infile_base_ef
-            if generate:
-                run(simulator.format(**params))
-                run(simulator.format(**params))
-            for k in ks:
-                params['k'] = k
-                params2 = deepcopy(params)
-                params2['infile_base'] = params2['infile_base_ef']
-                for p in [params, params2]:
-                    if compute_hist:
-                        if use_jellyfish:
-                            run(jellyfish_count.format(**p))
-                            run(jellyfish_hist.format(**p))
-                        else:
-                            run(khmer_count.format(**p))
-                            run(khmer_hist.format(**p))
-                    run(estimator.format(**p),
-                        '{infile_base}_k{k}.est.out'.format(**p))
-                    if run_khmer:
-                        run(khmer_cov.format(**p),
-                            '{infile_base}_k{k}.khmer.out'.format(**p))
+    for s in range(seq_cnt):
+        seq_name = 'simulated{}.fa'.format(s)
+        run(generator.format(seq_name=os.path.join(path, seq_name)))
+        for c in coverages:
+            for e in error_rates:
+                params = {
+                    'seq_name': seq_name,
+                    'error': e,
+                    'cov': c,
+                    'khmer_cov': max(1, int(c)),
+                }
+                infile_base = os.path.join(
+                    path, '{seq_name}_c{cov}_e{error}'.format(**params)
+                )
+                infile_base_ef = os.path.join(
+                    path, '{seq_name}_c{cov}_f{error}'.format(**params)
+                )
+                params['infile_base'] = infile_base
+                params['infile_base_ef'] = infile_base_ef
+                if generate:
+                    run(simulator.format(**params))
+                    run(simulator.format(**params))
+                for k in ks:
+                    params['k'] = k
+                    params2 = deepcopy(params)
+                    params2['infile_base'] = params2['infile_base_ef']
+                    for p in [params, params2]:
+                        if compute_hist:
+                            if use_jellyfish:
+                                run(jellyfish_count.format(**p))
+                                run(jellyfish_hist.format(**p))
+                            else:
+                                run(khmer_count.format(**p))
+                                run(khmer_hist.format(**p))
+                        run(estimator.format(**p),
+                            '{infile_base}_k{k}.est.out'.format(**p))
+                        if run_khmer:
+                            run(khmer_cov.format(**p),
+                                '{infile_base}_k{k}.khmer.out'.format(**p))
