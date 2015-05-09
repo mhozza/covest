@@ -128,15 +128,15 @@ def compute_average(table_lines):
         for k, v in val.items():
             try:
                 table_std_sum[key[1:]][k] += (v - table_avg[key[1:]][k]) ** 2
-            except TypeError as e:
+            except TypeError:
                 pass
 
     for key, val in table_std_sum.items():
         for k, v in val.items():
-            if table_cnt[key][k] == 0:
+            if table_cnt[key][k] <= 1:
                 table_std[key][k] = 0
             else:
-                table_std[key][k] = (v / table_cnt[key][k]) ** 0.5
+                table_std[key][k] = (v / (table_cnt[key][k] - 1)) ** 0.5
 
     return table_avg, table_std
 
