@@ -559,7 +559,6 @@ def main(args):
         else:
             guess = [cov, e]
 
-        print(guess)
         verbose_print('Initial guess: {} ll:{}'.format(
             guess, model.compute_loglikelihood(*guess)
         ))
@@ -604,7 +603,7 @@ if __name__ == '__main__':
                         help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
     parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=0,
-                        help='Trim histogram at this value')
+                        help='Trim histogram automatically with this treshold')
     parser.add_argument('-g', '--grid', action='store_true', default=False,
                         help='Use grid search')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
