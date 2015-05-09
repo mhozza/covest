@@ -3,8 +3,8 @@ import os
 import subprocess
 from copy import deepcopy
 
-generator = './generate_sequence.py {seq_name}'
-simulator = './read_simulator.py {seq_name} {infile_base}.fa'\
+generator = './generate_sequence.py {seq_name}.fa'
+simulator = './read_simulator.py {seq_name}.fa {infile_base}.fa'\
             ' -f {infile_base_ef}.fa -e {error} -c {cov}'
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile_base}.fa -o table.jf'
 jellyfish_hist = 'jellyfish histo table.jf -o {infile_base}_k{k}.dist'
@@ -15,13 +15,16 @@ khmer_hist = './khmer/scripts/abundance-dist.py'\
 khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genome-size.py'\
             ' {infile_base}.fa {infile_base}_k{k}.dist {khmer_cov}'
 # estimator = './coverage_estimator2.py {infile_base}_k{k}.dist -e {error} -k {k}'
-estimator = './covest.py {infile_base}_k{k}.dist -g -t 100 -T 16 -e {error} -k {k} -c {cov}'
+estimator = './covest.py {infile_base}_k{k}.dist -g -s {infile_base}.fa'\
+            ' -t 100 -T 16 -e {error} -k {k} -c {cov}'
 
 path = 'experiment3_1'
 
 seq_cnt = 5
 error_rates = [0.01, 0.03, 0.05, 0.1]
+# error_rates = [0.01]
 coverages = [0.1, 0.5, 1, 2, 4, 10, 50]
+# coverages = [4]
 ks = [21]
 
 generate = True
@@ -33,7 +36,7 @@ VERBOSE = True
 
 def run(command, output=None):
     if VERBOSE:
-        print('running command:', command)
+        print('executing command:', command)
     f = None
     if output:
         f = open(output, 'w')
@@ -42,7 +45,7 @@ def run(command, output=None):
 
 if __name__ == '__main__':
     for s in range(seq_cnt):
-        seq_name = os.path.join(path, 'simulated{}.fa'.format(s))
+        seq_name = os.path.join(path, 'simulated{}'.format(s))
         run(generator.format(seq_name=seq_name))
         for c in coverages:
             for e in error_rates:
