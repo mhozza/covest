@@ -207,11 +207,15 @@ def main(args):
         'estimated_coverage', 'estimated_error_rate',
     ]
 
-    table_formatters = {
-        'html': format_table_html,
-        'csv': format_table_csv,
+    format_templates = {
+        'html': 'templates/html.tpl',
+        'csv': 'templates/csv.tpl',
+        'tex': 'templates/tex.tpl',
     }
-    format_table = table_formatters[args.format]
+
+    format_escape = {
+        'tex': lambda x: x.replace('_', '\\_'),
+    }
 
     if args.average:
         table_lines = compute_average(table_lines)
@@ -226,7 +230,9 @@ def main(args):
         sorted(
             list(table_lines.values()),
             key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
-        )
+        ),
+        template_file=format_templates[args.format],
+        escape=format_escape.get(args.format, None),
     ))
 
 

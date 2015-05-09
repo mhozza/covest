@@ -10,3 +10,4 @@ scipy==0.14.1
 six==1.9.0
 biopython==1.65
 bigfloat==0.3.0
+pystache==0.5.4
