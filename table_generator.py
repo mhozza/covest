@@ -44,10 +44,12 @@ def format_table_html(header, lines):
 <link rel="stylesheet"
   href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
 </head>
+<body>
 <table class="table table-condensed table-hover">
   {thead}
   {tbody}
 </table>
+</body>
 </html>
     '''
     line_template = '<tr>\n{lbody}  </tr>'
