@@ -107,11 +107,13 @@ def compute_average(table_lines):
     table_cnt = defaultdict(lambda: defaultdict(int))
     table_sum = defaultdict(lambda: defaultdict(float))
     table_avg = defaultdict(lambda: defaultdict(float))
+    table_std_sum = defaultdict(lambda: defaultdict(float))
+    table_std = defaultdict(lambda: defaultdict(float))
     for key, val in table_lines.items():
         for k, v in val.items():
             try:
                 table_sum[key[1:]][k] += v
-                table_cnt[key[1:]][k] += 1
+                table_cnt[key[1:]][k] += 1.0
             except TypeError:
                 pass
 
@@ -122,7 +124,21 @@ def compute_average(table_lines):
             else:
                 table_avg[key][k] = v / table_cnt[key][k]
 
-    return table_avg
+    for key, val in table_lines.items():
+        for k, v in val.items():
+            try:
+                table_std_sum[key[1:]][k] += (v - table_avg[key[1:]][k]) ** 2
+            except TypeError as e:
+                pass
+
+    for key, val in table_std_sum.items():
+        for k, v in val.items():
+            if table_cnt[key][k] == 0:
+                table_std[key][k] = 0
+            else:
+                table_std[key][k] = (v / table_cnt[key][k]) ** 0.5
+
+    return table_avg, table_std
 
 
 def main(args):
@@ -168,10 +184,6 @@ def main(args):
             else:
                 table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
 
-
-    if args.average:
-        table_lines = compute_average(table_lines)
-
     # header = [
     #     'original_coverage', 'original_error_rate', 'original_k',
     #     'estimated_coverage', 'estimated_error_rate',
@@ -196,13 +208,29 @@ def main(args):
     }
     format_table = table_formatters[args.format]
 
-    print(format_table(
-        header,
-        sorted(
-            list(table_lines.values()),
-            key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
-        )
-    ))
+    if args.average:
+        table_avg, table_std = compute_average(table_lines)
+        print(format_table(
+            header,
+            combine_tables(
+                sorted(
+                    list(table_avg.values()),
+                    key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
+                ),
+                sorted(
+                    list(table_std.values()),
+                    key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
+                ),
+            )
+        ))
+    else:
+        print(format_table(
+            header,
+            sorted(
+                list(table_lines.values()),
+                key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
+            )
+        ))
 
 
 if __name__ == '__main__':
