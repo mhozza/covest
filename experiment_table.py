@@ -11,11 +11,12 @@ def parse_fname(fname, error=True):
     base, ext = os.path.splitext(os.path.splitext(fname)[0])
     base = os.path.basename(base)
     parts = base.split('_')
+    seq_name = parts[0]
     if error:
         cov = parts[1][1:]
         error = parts[2][1:]
         k = parts[3][1:]
-        return float(cov), float(error), int(k), ext, parts[2][0] == 'f'
+        return seq_name, float(cov), float(error), int(k), ext, parts[2][0] == 'f'
     else:
         ef = False
         cov = parts[1][1:]
@@ -23,7 +24,7 @@ def parse_fname(fname, error=True):
             ef = True
             cov = cov[:-1]
         k = parts[2][1:]
-        return float(cov), None, int(k), ext, ef
+        return seq_name, float(cov), None, int(k), ext, ef
 
 
 def parse_khmer(fname):
@@ -102,18 +103,41 @@ def kmer_to_read_coverage(c, k, read_length=100):
         return c * read_length / (read_length - k + 1)
 
 
+def compute_average(table_lines):
+    table_cnt = defaultdict(lambda: defaultdict(int))
+    table_sum = defaultdict(lambda: defaultdict(float))
+    table_avg = defaultdict(lambda: defaultdict(float))
+    for key, val in table_lines.items():
+        for k, v in val.items():
+            try:
+                table_sum[key[1:]][k] += v
+                table_cnt[key[1:]][k] += 1
+            except TypeError:
+                pass
+
+    for key, val in table_sum.items():
+        for k, v in val.items():
+            if table_cnt[key][k] == 0:
+                table_avg[key][k] = None
+            else:
+                table_avg[key][k] = v / table_cnt[key][k]
+
+    return table_avg
+
+
 def main(args):
     path = args.path
-    files = sorted(glob.glob(os.path.join(path, '*.out')))
+    files = sorted(glob.glob(os.path.join(path, args.filter)))
     error = not args.no_error
 
     table_lines = defaultdict(dict)
+    sequences = set()
 
     for fname in files:
-        cov, error, k, ext, ef = parse_fname(fname, error)
+        seq_name, cov, error, k, ext, ef = parse_fname(fname, error)
         repeats = ext[-1] == 'r'
-
-        key = (cov, error, k, repeats)
+        sequences.add(seq_name)
+        key = (seq_name, cov, error, k, repeats)
 
         table_lines[key]['original_coverage'] = cov
         table_lines[key]['original_error_rate'] = error
@@ -144,6 +168,10 @@ def main(args):
             else:
                 table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
 
+
+    if args.average:
+        table_lines = compute_average(table_lines)
+
     # header = [
     #     'original_coverage', 'original_error_rate', 'original_k',
     #     'estimated_coverage', 'estimated_error_rate',
@@ -162,7 +190,13 @@ def main(args):
         'estimated_loglikelihood', 'guessed_loglikelihood',
     ]
 
-    print(format_table_html(
+    table_formatters = {
+        'html': format_table_html,
+        'csv': format_table_csv,
+    }
+    format_table = table_formatters[args.format]
+
+    print(format_table(
         header,
         sorted(
             list(table_lines.values()),
@@ -175,6 +209,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Parse experiment output and generate table')
     parser.add_argument('path', help='Experiment')
     parser.add_argument('-f', '--format', default='html', help='Table format')
+    parser.add_argument('-i', '--filter', default='*.out', help='Filter files')
+    parser.add_argument('-a', '--average', action='store_true', help='Compute average from all sequences')
     parser.add_argument('-ne', '--no-error', action='store_true', help='Error is unknown')
     parser.add_argument('--legacy', action='store_true', help='Run in legacy mode')
     args = parser.parse_args()
