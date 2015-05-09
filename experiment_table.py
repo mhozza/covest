@@ -103,12 +103,11 @@ def kmer_to_read_coverage(c, k, read_length=100):
         return c * read_length / (read_length - k + 1)
 
 
-def compute_average(table_lines):
+def compute_average(table_lines, std_key_suffix='_std'):
     table_cnt = defaultdict(lambda: defaultdict(int))
     table_sum = defaultdict(lambda: defaultdict(float))
     table_avg = defaultdict(lambda: defaultdict(float))
     table_std_sum = defaultdict(lambda: defaultdict(float))
-    table_std = defaultdict(lambda: defaultdict(float))
     for key, val in table_lines.items():
         for k, v in val.items():
             try:
@@ -134,11 +133,11 @@ def compute_average(table_lines):
     for key, val in table_std_sum.items():
         for k, v in val.items():
             if table_cnt[key][k] <= 1:
-                table_std[key][k] = 0
+                table_avg[key][k + std_key_suffix] = 0
             else:
-                table_std[key][k] = (v / (table_cnt[key][k] - 1)) ** 0.5
+                table_avg[key][k + std_key_suffix] = (v / (table_cnt[key][k] - 1)) ** 0.5
 
-    return table_avg, table_std
+    return table_avg
 
 
 def main(args):
@@ -206,8 +205,6 @@ def main(args):
     header = [
         'original_coverage', 'original_error_rate',
         'estimated_coverage', 'estimated_error_rate',
-        # 'guessed_coverage', 'guessed_error_rate',
-        # 'estimated_loglikelihood', 'guessed_loglikelihood',
     ]
 
     table_formatters = {
@@ -217,28 +214,20 @@ def main(args):
     format_table = table_formatters[args.format]
 
     if args.average:
-        table_avg, table_std = compute_average(table_lines)
-        print(format_table(
-            header,
-            combine_tables(
-                sorted(
-                    list(table_avg.values()),
-                    key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
-                ),
-                sorted(
-                    list(table_std.values()),
-                    key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
-                ),
-            )
-        ))
-    else:
-        print(format_table(
-            header,
-            sorted(
-                list(table_lines.values()),
-                key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
-            )
-        ))
+        table_lines = compute_average(table_lines)
+        header = [
+            'original_coverage', 'original_error_rate',
+            'estimated_coverage', 'estimated_coverage_std',
+            'estimated_error_rate', 'estimated_error_rate_std',
+        ]
+
+    print(format_table(
+        header,
+        sorted(
+            list(table_lines.values()),
+            key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
+        )
+    ))
 
 
 if __name__ == '__main__':
