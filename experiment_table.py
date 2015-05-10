@@ -226,7 +226,8 @@ def main(args):
         'estimated_coverage_std': 'Est. Coverage Std',
         'estimated_error_rate': 'Est. Error Rate',
         'estimated_error_rate_std': 'Est. Error Rate Std',
-        'estimated_genome_size': 'Est. Genome Size'
+        'estimated_genome_size': 'Est. Genome Size',
+        'estimated_genome_size_std': 'Est. Genome Size Std',
     }
 
     if args.average:
@@ -235,7 +236,7 @@ def main(args):
             'original_coverage', 'original_error_rate',
             'estimated_coverage', 'estimated_coverage_std',
             'estimated_error_rate', 'estimated_error_rate_std',
-            'estimated_genome_size',
+            'estimated_genome_size', 'estimated_genome_size_std',
         ]
 
     print(format_table(
