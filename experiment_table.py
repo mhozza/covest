@@ -235,6 +235,7 @@ def main(args):
             'original_coverage', 'original_error_rate',
             'estimated_coverage', 'estimated_coverage_std',
             'estimated_error_rate', 'estimated_error_rate_std',
+            'estimated_genome_size',
         ]
 
     print(format_table(
