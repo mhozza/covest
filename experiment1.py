@@ -46,7 +46,8 @@ def run(command, output=None):
 if __name__ == '__main__':
     for s in range(seq_cnt):
         seq_name = os.path.join(path, 'simulated{}'.format(s))
-        run(generator.format(seq_name=seq_name))
+        if generate:
+            run(generator.format(seq_name=seq_name))
         for c in coverages:
             for e in error_rates:
                 params = {
