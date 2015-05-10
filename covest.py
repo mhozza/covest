@@ -422,7 +422,7 @@ class CoverageEstimator:
                 if orig_q is None:
                     orig_q = estimated[4]
             if read_count is not None:
-                output_data['genome_size'] = read_count / estimated[0]
+                output_data['estimated_genome_size'] = read_count / estimated[0]
 
         if orig_error_rate is not None:
             output_data['original_error_rate'] = orig_error_rate
