@@ -92,14 +92,14 @@ def load_dist(fname, autotrim=None, trim=None):
     return all_kmers, unique_kmers, observed_ones, hist_l
 
 
-def count_reads(fname):
+def count_reads_size(fname):
     from Bio import SeqIO
     _, ext = path.splitext(fname)
     fmt = 'fasta'
     if ext == '.fq' or ext == '.fastq':
         fmt = 'fastq'
     with open(fname, "rU") as f:
-        return sum(1 for read in SeqIO.parse(f, fmt))
+        return sum(len(read) for read in SeqIO.parse(f, fmt))
 
 
 def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
@@ -394,7 +394,7 @@ class CoverageEstimator:
     def print_output(self, estimated=None, guess=None,
                      orig_coverage=None, orig_error_rate=None,
                      orig_q1=None, orig_q2=None, orig_q=None,
-                     repeats=False, silent=False, read_count=None):
+                     repeats=False, silent=False, reads_size=None):
         output_data = dict()
         output_data['model'] = self.model.__class__.__name__
 
@@ -421,8 +421,10 @@ class CoverageEstimator:
                     orig_q2 = estimated[3]
                 if orig_q is None:
                     orig_q = estimated[4]
-            if read_count is not None:
-                output_data['estimated_genome_size'] = read_count / estimated[0]
+            if reads_size is not None:
+                output_data['estimated_genome_size'] = int(
+                    round(reads_size / estimated[0])
+                )
 
         if orig_error_rate is not None:
             output_data['original_error_rate'] = orig_error_rate
@@ -574,14 +576,14 @@ def main(args):
         res = estimator.compute_coverage(
             guess, use_grid=args.grid, n_threads=args.thread_count
         )
-        read_count = None
+        reads_size = None
         if args.genome_size is not None:
             # genome_size contains read file name
-            read_count = count_reads(args.genome_size)
+            reads_size = count_reads_size(args.genome_size)
 
         estimator.print_output(
             res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
-            repeats=args.repeats, read_count=read_count,
+            repeats=args.repeats, reads_size=reads_size,
         )
 
         if args.plot:

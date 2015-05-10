@@ -1,10 +1,10 @@
 #! /usr/bin/env python3
 import argparse
-from covest import count_reads
+from covest import count_reads_size
 
 
 def main(args):
-    rc = count_reads(args.reads)
+    rc = count_reads_size(args.reads)
     print('Genome size:', int(round(rc / args.coverage)))
 
 
