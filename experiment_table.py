@@ -178,6 +178,8 @@ def main(args):
                 table_lines[key]['guessed_error_rate'] = d.get('guessed_error_rate', None)
                 table_lines[key]['guessed_loglikelihood'] = d.get('guessed_loglikelihood', None)
                 table_lines[key]['original_loglikelihood'] = d.get('original_loglikelihood', None)
+                table_lines[key]['estimated_genome_size'] = d.get('estimated_genome_size', None)
+
         else:
             if ef:
                 table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
@@ -217,6 +219,16 @@ def main(args):
         'tex': lambda x: x.replace('_', '\\_'),
     }
 
+    titles = {
+        'original_coverage': 'Coverage',
+        'original_error_rate': 'Error Rate',
+        'estimated_coverage': 'Est. Coverage',
+        'estimated_coverage_std': 'Est. Coverage Std',
+        'estimated_error_rate': 'Est. Error Rate',
+        'estimated_error_rate_std': 'Est. Error Rate Std',
+        'estimated_genome_size': 'Est. Genome Size'
+    }
+
     if args.average:
         table_lines = compute_average(table_lines)
         header = [
@@ -227,6 +239,7 @@ def main(args):
 
     print(format_table(
         header,
+        titles,
         sorted(
             list(table_lines.values()),
             key=lambda x: (x['original_coverage'], x['original_error_rate'], x['original_k'], x.get('repeats', False))
