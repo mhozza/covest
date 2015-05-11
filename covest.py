@@ -63,9 +63,6 @@ def get_trim(hist, precision=0):
 
 
 def load_dist(fname, autotrim=None, trim=None):
-    unique_kmers = 0
-    all_kmers = 0.0
-    observed_ones = 0
     hist = defaultdict(int)
     max_hist = 0
 
@@ -76,11 +73,6 @@ def load_dist(fname, autotrim=None, trim=None):
             cnt = int(l[1])
             hist[i] = cnt
             max_hist = max(max_hist, i)
-            if i == 1:
-                observed_ones = cnt
-            if i >= 2:
-                unique_kmers += cnt
-                all_kmers += i * cnt
 
     hist_l = [hist[b] for b in range(max_hist)]
     if autotrim is not None:
@@ -89,7 +81,7 @@ def load_dist(fname, autotrim=None, trim=None):
         hist_l = hist_l[:trim]
     elif trim is not None:
         hist_l = hist_l[:trim]
-    return all_kmers, unique_kmers, observed_ones, hist_l
+    return hist_l
 
 
 def count_reads_size(fname):
@@ -102,10 +94,18 @@ def count_reads_size(fname):
         return sum(len(read) for read in SeqIO.parse(f, fmt))
 
 
-def compute_coverage_apx(all_kmers, unique_kmers, observed_ones, k, r):
-    if unique_kmers == 0:
+def compute_coverage_apx(hist, k, r):
+    observed_ones = hist[1]
+    all_kmers = sum(i * h for i, h in enumerate(hist))
+    total_unique_kmers = sum(h for h in hist)
+    all_kmers, total_unique_kmers, observed_ones
+
+    if total_unique_kmers == 0:
         return 0.0, 1.0
-    total_unique_kmers = unique_kmers + observed_ones
+
+    # discard first column
+    all_kmers -= observed_ones
+    unique_kmers = total_unique_kmers - observed_ones
     # compute coverage from hist >=2
     cov = all_kmers / unique_kmers
     # fix coverage
@@ -522,7 +522,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
 
 @running_time_decorator
 def main(args):
-    all_kmers, unique_kmers, observed_ones, hist = load_dist(
+    hist = load_dist(
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
 
@@ -546,10 +546,7 @@ def main(args):
             cov, e, q1, q2, q = args.c, args.e, args.q1, args.q2, args.q
         else:
             # compute guess
-            cov, e = compute_coverage_apx(
-                all_kmers, unique_kmers, observed_ones,
-                args.kmer_size, args.read_length
-            )
+            cov, e = compute_coverage_apx(hist, args.kmer_size, args.read_length)
             if args.fix:
                 if args.coverage is not None:
                     cov = args.coverage
