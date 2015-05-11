@@ -107,28 +107,31 @@ def compute_coverage_apx(hist, k, r):
     all_kmers -= observed_ones
     unique_kmers = total_unique_kmers - observed_ones
     # compute coverage from hist >=2
-    cov = all_kmers / unique_kmers
-    # fix coverage
-    fn = lambda cov: (cov - cov * exp(-cov)) / (1 - exp(-cov) - cov * exp(-cov))
-    fix_coverage = inverse(fn)
-    cov = fix_coverage(cov)
-    # fix unique kmers
-    unique_kmers /= (1.0 - exp(-cov) - cov * exp(-cov))
-    # compute alpha (error read ratio)
-    estimated_ones = unique_kmers * cov * exp(-cov)
-    estimated_zeros = unique_kmers * exp(-cov)
-    error_ones = max(0.0, observed_ones - estimated_ones)
-    alpha = error_ones / (total_unique_kmers + estimated_zeros)
-    # estimate probability of correct kmer and error rate
-    estimated_p = max(0.0, estimate_p(cov, alpha))
-    e = 1 - estimated_p ** (1.0 / k)
-    # return corrected coverage and error estimate
-    if estimated_p > 0:
-        # function for conversion between kmer and base coverage
-        kmer_to_read_coverage = lambda c: c * r / (r - k + 1)
-        return float(kmer_to_read_coverage(cov / estimated_p)), float(e)
-    else:
-        return 0.0, float(e)
+    try:
+        cov = all_kmers / unique_kmers
+        # fix coverage
+        fn = lambda cov: (cov - cov * exp(-cov)) / (1 - exp(-cov) - cov * exp(-cov))
+        fix_coverage = inverse(fn)
+        cov = fix_coverage(cov)
+        # fix unique kmers
+        unique_kmers /= (1.0 - exp(-cov) - cov * exp(-cov))
+        # compute alpha (error read ratio)
+        estimated_ones = unique_kmers * cov * exp(-cov)
+        estimated_zeros = unique_kmers * exp(-cov)
+        error_ones = max(0.0, observed_ones - estimated_ones)
+        alpha = error_ones / (total_unique_kmers + estimated_zeros)
+        # estimate probability of correct kmer and error rate
+        estimated_p = max(0.0, estimate_p(cov, alpha))
+        e = 1 - estimated_p ** (1.0 / k)
+        # return corrected coverage and error estimate
+        if estimated_p > 0:
+            # function for conversion between kmer and base coverage
+            kmer_to_read_coverage = lambda c: c * r / (r - k + 1)
+            return float(kmer_to_read_coverage(cov / estimated_p)), float(e)
+        else:
+            return 0.0, float(e)
+    except ZeroDivisionError:
+        return 0.0, 1.0
 
 
 def safe_log(x):
