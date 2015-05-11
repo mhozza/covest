@@ -554,6 +554,10 @@ def main(args):
         else:
             # compute guess
             cov, e = compute_coverage_apx(hist, args.kmer_size, args.read_length)
+            # We were unable to guess cov and e.
+            # Try to estimate from some fixed valid data instead.
+            if (cov, e) == (0, 1):
+                cov, e = 1, 0.5
             if args.fix:
                 if args.coverage is not None:
                     cov = args.coverage
@@ -568,12 +572,6 @@ def main(args):
         verbose_print('Initial guess: {} ll:{}'.format(
             guess, model.compute_loglikelihood(*guess)
         ))
-
-        # We were unable to guess cov and e.
-        # Try to estimate from some fixed valid data instead.
-        if cov == 0 and e == 1:
-            cov = 1
-            e = 0.5
 
         fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
         estimator = CoverageEstimator(model, fix)
