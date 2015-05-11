@@ -152,13 +152,13 @@ def compute_average(table_lines, std_key_suffix='_std'):
 def main(args):
     path = args.path
     files = sorted(glob.glob(os.path.join(path, args.filter)))
-    error = not args.no_error
+    err = not args.no_error
 
     table_lines = defaultdict(dict)
     sequences = set()
 
     for fname in files:
-        seq_name, cov, error, k, ext, ef = parse_fname(fname, error)
+        seq_name, cov, error, k, ext, ef = parse_fname(fname, err)
         repeats = ext[-1] == 'r'
         sequences.add(seq_name)
         key = (seq_name, cov, error, k, repeats)
