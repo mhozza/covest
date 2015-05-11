@@ -421,8 +421,15 @@ class CoverageEstimator:
                     orig_q2 = estimated[3]
                 if orig_q is None:
                     orig_q = estimated[4]
+
+            output_data['estimated_genome_size'] = int(round(
+                sum(
+                    i * h for i, h in enumerate(self.model.hist)
+                ) / self.model.correct_c(estimated[0])
+            ))
+
             if reads_size is not None:
-                output_data['estimated_genome_size'] = int(
+                output_data['estimated_genome_size_r'] = int(
                     round(reads_size / estimated[0])
                 )
 
