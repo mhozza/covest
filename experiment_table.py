@@ -6,6 +6,8 @@ import json
 from collections import defaultdict
 from table_generator import *
 
+SEPARATE_EF = True
+
 
 def parse_fname(fname, error=True):
     base, ext = os.path.splitext(os.path.splitext(fname)[0])
@@ -13,18 +15,24 @@ def parse_fname(fname, error=True):
     parts = base.split('_')
     seq_name = parts[0]
     if error:
-        cov = parts[1][1:]
-        error = parts[2][1:]
-        k = parts[3][1:]
-        return seq_name, float(cov), float(error), int(k), ext, parts[2][0] == 'f'
+        ef = parts[2][0] == 'f'
+        cov = float(parts[1][1:])
+        error = float(parts[2][1:])
+        k = int(parts[3][1:])
     else:
         ef = False
-        cov = parts[1][1:]
+        error = None
+        cov = float(parts[1][1:])
         if cov[-1] == 'f':
             ef = True
             cov = cov[:-1]
         k = parts[2][1:]
-        return seq_name, float(cov), None, int(k), ext, ef
+
+    if ef and SEPARATE_EF:
+        error = 0.0
+        return seq_name, cov, error, k, ext, False
+    else:
+        return seq_name, cov, error, k, ext, ef
 
 
 def parse_khmer(fname):
