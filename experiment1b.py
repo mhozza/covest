@@ -4,6 +4,7 @@ import subprocess
 from copy import deepcopy
 
 source = 'data/chr14.fa'
+source = 'data/ecoli2.fa'
 source = 'data/yeast/chrXV.fa'
 source = 'data/prame-partial-hg38.fa'
 
@@ -17,22 +18,24 @@ khmer_hist = './khmer/scripts/abundance-dist.py'\
              ' hash_table.kh {infile} {infile_base}_k{k}.dist'
 khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genome-size.py'\
             ' {infile} {infile_base}_k{k}.dist {khmer_cov}'
-estimator = './covest.py {infile_base}_k{k}.dist -k {k} -at 6'
-estimator_r = './covest.py {infile_base}_k{k}.dist -k {k} --rp -at6'
+estimator = './covest.py {infile_base}_k{k}.dist -g -s {infile_base}.fa'\
+            ' -t 100 -T 16 -e {error} -k {k} -c {cov}'
+estimator_r = './covest.py {infile_base}_k{k}.dist -g -s {infile_base}.fa'\
+              ' -t 100 -T 16 -e {error} -k {k} -c {cov} -rp'
 
-path = 'experiment2p'
+path = 'experiment3p'
 
-# coverages = [0.5, 1, 2, 4, 10, 30]
-coverages = [4, 10]
+coverages = [0.5, 1, 4, 10, 50]
+# coverages = [4, 10]
 ks = [21]
 
-generate = False
+generate = True
 generate_dist = generate
 use_jellyfish = True
 ef = False
 run_khmer = False
-run_rep = True
-run_norep = True
+run_rep = False
+run_norep = False
 
 
 def run(command, output=None):
