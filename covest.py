@@ -422,14 +422,15 @@ class CoverageEstimator:
                 if orig_q is None:
                     orig_q = estimated[4]
 
-            output_data['estimated_genome_size'] = int(round(
+            safe_int = lambda s: int(s) if s.isdigit() else None
+            output_data['estimated_genome_size'] = safe_int(round(
                 sum(
                     i * h for i, h in enumerate(self.model.hist)
                 ) / self.model.correct_c(estimated[0])
             ))
 
             if reads_size is not None:
-                output_data['estimated_genome_size_r'] = int(
+                output_data['estimated_genome_size_r'] = safe_int(
                     round(reads_size / estimated[0])
                 )
 
@@ -556,7 +557,7 @@ def main(args):
             cov, e = compute_coverage_apx(hist, args.kmer_size, args.read_length)
             # We were unable to guess cov and e.
             # Try to estimate from some fixed valid data instead.
-            if (cov, e) == (0, 1):
+            if cov == 0 and e == 1:
                 cov, e = 1, 0.5
             if args.fix:
                 if args.coverage is not None:
