@@ -422,7 +422,7 @@ class CoverageEstimator:
                 if orig_q is None:
                     orig_q = estimated[4]
 
-            safe_int = lambda s: int(s) if s.isdigit() else None
+            safe_int = lambda x: int(x) if x != float('inf') else None
             output_data['estimated_genome_size'] = safe_int(round(
                 sum(
                     i * h for i, h in enumerate(self.model.hist)
