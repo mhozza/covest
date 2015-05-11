@@ -17,11 +17,11 @@ def parse_fname(fname, error=True):
     if error:
         ef = parts[2][0] == 'f'
         cov = float(parts[1][1:])
-        error = float(parts[2][1:])
+        e = float(parts[2][1:])
         k = int(parts[3][1:])
     else:
         ef = False
-        error = None
+        e = None
         cov = parts[1][1:]
         if cov[-1] == 'f':
             ef = True
@@ -30,10 +30,10 @@ def parse_fname(fname, error=True):
         cov = float(cov)
 
     if ef and SEPARATE_EF:
-        error = 0.0
-        return seq_name, cov, error, k, ext, False
+        e = 0.0
+        return seq_name, cov, e, k, ext, False
     else:
-        return seq_name, cov, error, k, ext, ef
+        return seq_name, cov, e, k, ext, ef
 
 
 def parse_khmer(fname):
