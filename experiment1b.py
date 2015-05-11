@@ -62,7 +62,8 @@ if __name__ == '__main__':
 
         if generate:
             run(simulator.format(**params))
-            run(simulator_ef.format(**params))
+            if ef:
+                run(simulator_ef.format(**params))
             # run('rm {path}/*.sam {path}/*.aln'.format(path=path))
 
         for k in ks:
