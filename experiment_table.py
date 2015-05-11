@@ -22,11 +22,12 @@ def parse_fname(fname, error=True):
     else:
         ef = False
         error = None
-        cov = float(parts[1][1:])
+        cov = parts[1][1:]
         if cov[-1] == 'f':
             ef = True
             cov = cov[:-1]
-        k = parts[2][1:]
+        k = int(parts[2][1:])
+        cov = float(cov)
 
     if ef and SEPARATE_EF:
         error = 0.0
