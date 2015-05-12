@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 import sys
 import itertools
 from collections import defaultdict
@@ -12,7 +12,7 @@ from perf import running_time_decorator, running_time
 from functools import lru_cache
 import json
 from math import exp, log
-from multiprocessing import Pool
+from multiprocessing import Pool  # pylint: disable=E0611
 import pickle
 from os import path
 # from utils import print_wrap as pw
@@ -98,7 +98,6 @@ def compute_coverage_apx(hist, k, r):
     observed_ones = hist[1]
     all_kmers = sum(i * h for i, h in enumerate(hist))
     total_unique_kmers = sum(h for h in hist)
-    all_kmers, total_unique_kmers, observed_ones
 
     if total_unique_kmers == 0:
         return 0.0, 1.0
@@ -148,11 +147,11 @@ def fix_zero(x, val=1):
 
 
 class BasicModel:
-    def __init__(self, k, r, hist, max_error=None):
+    def __init__(self, k, r, hist, max_error=None, max_cov=None):
         self.repeats = False
         self.k = k
         self.r = r
-        self.bounds = ((0.0, None), (0.0, 1.0))
+        self.bounds = ((0.0, max_cov), (0.0, 1.0))
         self.comb = [comb(k, s) for s in range(k + 1)]
         self.hist = hist
         if max_error is None:
@@ -172,7 +171,7 @@ class BasicModel:
         return c * (self.r - self.k + 1) / self.r
 
     def tr_poisson(self, l, j):
-        with numpy.errstate(over='raise'):
+        with numpy.errstate(over='raise'):  # pylint: disable=E1101
             try:
                 if exp(l) == 1.0:  # precision fix
                     return 0.0
@@ -197,7 +196,7 @@ class BasicModel:
             for s in range(self.max_error)
         ]
 
-    def compute_probabilities(self, c, err, *args):
+    def compute_probabilities(self, c, err, *_):
         # read to kmer coverage
         c = self.correct_c(c)
         # lambda for kmers with s errors
@@ -266,10 +265,10 @@ class BasicModel:
 
 
 class RepeatsModel2(BasicModel):
-    def __init__(self, k, r, hist, max_error=None, treshold=1e-8):
+    def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
         super(RepeatsModel2, self).__init__(k, r, hist, max_error)
         self.repeats = False
-        self.bounds = ((0.0, None), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
+        self.bounds = ((0.0, max_cov), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
         self.treshold = treshold
 
     def get_hist_treshold(self, b_o, treshold):
@@ -295,7 +294,7 @@ class RepeatsModel2(BasicModel):
                 return o_n * (1 - q) ** (o - 3)
         return b_o
 
-    def compute_probabilities(self, c, err, q1, q2, q):
+    def compute_probabilities(self, c, err, q1, q2, q):  # pylint: disable=W0221
         b_o = self.get_b_o(q1, q2, q)
         treshold_o = self.get_hist_treshold(b_o, self.treshold)
         # read to kmer coverage
@@ -332,7 +331,7 @@ class RepeatsModel2(BasicModel):
 class RepeatsModel(RepeatsModel2):
     @lru_cache(maxsize=None)
     def compute_repeat_table(self, c, err, treshold_o):
-        p_j = super(RepeatsModel2, self).compute_probabilities(c, err)
+        p_j = super(RepeatsModel2, self).compute_probabilities(c, err)  # pylint: disable=E1003
         p_oj = [
             [None], p_j
         ]
@@ -468,7 +467,7 @@ def unpack_call(args):
 
 @running_time_decorator
 def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
-                  options=None, n_threads=DEFAULT_THREAD_COUNT):
+                  n_threads=DEFAULT_THREAD_COUNT):
     def generate_grid(args, step, max_depth):
         def generate_grid_single(var, fix=None):
             if fix is None:
@@ -542,7 +541,7 @@ def main(args):
         model_class = models[args.model]
     else:
         model_class = BasicModel
-    model = model_class(args.kmer_size, args.read_length, hist, max_error=8)
+    model = model_class(args.kmer_size, args.read_length, hist, max_error=8, max_cov=args.max_cov)
 
     orig = [args.coverage, args.error_rate, args.q1, args.q2, args.q]
     if not args.repeats:
@@ -610,6 +609,7 @@ if __name__ == '__main__':
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
+    parser.add_argument('-m', '--max-coverage', type=int, help='Upper coverage limit')
     parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=0,
                         help='Trim histogram automatically with this treshold')
     parser.add_argument('-g', '--grid', action='store_true', default=False,
@@ -629,5 +629,4 @@ if __name__ == '__main__':
                         help='Thread count')
     parser.add_argument('-s', '--genome-size', help='Calculate genome size from reads')
 
-    args = parser.parse_args()
-    main(args)
+    main(parser.parse_args())
