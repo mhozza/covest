@@ -25,6 +25,7 @@ def reverse_complement(seq):
         'C': 'G',
         'A': 'T',
         'T': 'A',
+        'N': 'N',
     }
     return ''.join(complement[x] for x in reversed(seq))
 
