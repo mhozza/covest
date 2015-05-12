@@ -4,7 +4,7 @@ import glob
 import os
 import json
 from collections import defaultdict
-from table_generator import *
+from table_generator import format_table
 
 SEPARATE_EF = True
 
@@ -67,7 +67,7 @@ def parse_estimate(fname):
     est_likelihood = None
     d = dict()
     with open(fname) as f:
-        for i, line in enumerate(f):
+        for _, line in enumerate(f):
             line = line[1:len(line) - 2]
             parts = line.split(',')
             if parts[0] == err:
