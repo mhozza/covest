@@ -40,7 +40,7 @@ def load_reads(fname):
 
 
 def main(fname, genome_file, read_length, error_rate, coverage, error_free_fname=None):
-    genome = list(load_reads(genome_file))[0]
+    genome = list(load_reads(genome_file))[0].upper()
     genome_size = len(genome)
     read_count = int(round((coverage * genome_size) / float(read_length)))
     with open(fname, 'w') as f:
