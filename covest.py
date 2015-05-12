@@ -79,6 +79,7 @@ def load_hist(fname, autotrim=None, trim=None):
         trim = get_trim(hist_l, autotrim)
         verbose_print('Trimming at: {}'.format(trim))
         hist_l = hist_l[:trim]
+        hist_trimed = hist_l
     elif trim is not None:
         hist_trimed = hist_l[:trim]
     return hist_l, hist_trimed
