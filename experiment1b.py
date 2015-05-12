@@ -10,6 +10,9 @@ source = 'data/prame-partial-hg38.fa'
 
 simulator = 'art_bin_VanillaIceCream/art_illumina -i {src} -o {infile_base} -f {cov} -l 100 -ef'
 simulator_ef = './sam_to_fasta.py {infile_base}_errFree.sam'
+simulator_simple = './read_simulator.py {src} {infile_base}.fa'\
+            ' -f {infile_base_ef}.fa -e 0.03 -c {cov}'
+
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o table.jf'
 jellyfish_hist = 'jellyfish histo table.jf -o {infile_base}_k{k}.dist'
 khmer_count = './khmer/scripts/load-into-counting.py -x 2e9 -n 6'\
@@ -19,9 +22,9 @@ khmer_hist = './khmer/scripts/abundance-dist.py'\
 khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genome-size.py'\
             ' {infile} {infile_base}_k{k}.dist {khmer_cov}'
 estimator = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
-            ' -t 100 -T 16 -k {k} -c {cov}'
+            ' -t 100 -T 16 -k {k} -c {cov} -m 700'
 estimator_r = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
-              ' -t 100 -T 16 -k {k} -c {cov} -rp'
+              ' -t 100 -T 16 -k {k} -c {cov} -rp -m 700'
 
 path = 'experiment3p'
 
@@ -29,6 +32,7 @@ coverages = [0.5, 1, 4, 10, 50]
 # coverages = [4, 10]
 ks = [21]
 
+USE_SIMPLE_SIMULATOR = True
 generate = True
 generate_dist = generate
 use_jellyfish = True
@@ -55,16 +59,25 @@ if __name__ == '__main__':
             path, 'experiment1_c{cov}'.format(**params)
         )
 
-        params['infile_base'] = infile_base
-        params['infile_base_ef'] = infile_base + 'f'
-        params['infile'] = '{}.fq'.format(params['infile_base'])
-        params['infile_ef'] = '{}_errFree.fa'.format(params['infile_base'])
+        if USE_SIMPLE_SIMULATOR:
+            params['infile_base'] = infile_base
+            params['infile_base_ef'] = infile_base + 'f'
+            params['infile'] = '{}.fa'.format(params['infile_base'])
+            params['infile_ef'] = '{}.fa'.format(params['infile_base_ef'])
+        else:
+            params['infile_base'] = infile_base
+            params['infile_base_ef'] = infile_base + 'f'
+            params['infile'] = '{}.fq'.format(params['infile_base'])
+            params['infile_ef'] = '{}_errFree.fa'.format(params['infile_base'])
 
         if generate:
-            run(simulator.format(**params))
-            if ef:
-                run(simulator_ef.format(**params))
-            # run('rm {path}/*.sam {path}/*.aln'.format(path=path))
+            if USE_SIMPLE_SIMULATOR:
+                run(simulator_simple.format(**params))
+            else:
+                run(simulator.format(**params))
+                if ef:
+                    run(simulator_ef.format(**params))
+                # run('rm {path}/*.sam {path}/*.aln'.format(path=path))
 
         for k in ks:
             params['k'] = k
