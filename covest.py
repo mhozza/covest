@@ -39,7 +39,7 @@ def verbose_print(message):
 try:
     if not USE_BIGFLOAT:
         raise ImportError("USE_BIGFLOAT is false")
-    from bigfloat import BigFloat
+    from bigfloat import BigFloat, exp
 except ImportError:
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
 
@@ -541,7 +541,7 @@ def main(args):
         model_class = models[args.model]
     else:
         model_class = BasicModel
-    model = model_class(args.kmer_size, args.read_length, hist, max_error=8, max_cov=args.max_cov)
+    model = model_class(args.kmer_size, args.read_length, hist, max_error=8, max_cov=args.max_coverage)
 
     orig = [args.coverage, args.error_rate, args.q1, args.q2, args.q]
     if not args.repeats:
