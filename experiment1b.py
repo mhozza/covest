@@ -14,7 +14,7 @@ simulator_simple = './read_simulator.py {src} {infile_base}.fa'\
             ' -f {infile_base_ef}.fa -e 0.03 -c {cov}'
 
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o table.jf'
-jellyfish_hist = 'jellyfish histo table.jf -o {infile_base}_k{k}.dist'
+jellyfish_hist = 'jellyfish histo table.jf_0 -o {infile_base}_k{k}.dist'
 khmer_count = './khmer/scripts/load-into-counting.py -x 2e9 -n 6'\
               ' -k {k} hash_table.kh {infile}'
 khmer_hist = './khmer/scripts/abundance-dist.py'\
@@ -26,7 +26,7 @@ estimator = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
 estimator_r = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
               ' -t 100 -T 16 -k {k} -c {cov} -rp -m 700'
 
-path = 'experiment3p'
+path = 'experiment3e'
 
 coverages = [0.5, 1, 4, 10, 50]
 # coverages = [4, 10]

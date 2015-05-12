@@ -7,7 +7,7 @@ generator = './generate_sequence.py {seq_name}.fa'
 simulator = './read_simulator.py {seq_name}.fa {infile_base}.fa'\
             ' -f {infile_base_ef}.fa -e {error} -c {cov}'
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile_base}.fa -o table.jf'
-jellyfish_hist = 'jellyfish histo table.jf -o {infile_base}_k{k}.dist'
+jellyfish_hist = 'jellyfish histo table.jf_0 -o {infile_base}_k{k}.dist'
 khmer_count = './khmer/scripts/load-into-counting.py -x 1e9'\
               ' -k {k} hash_table.kh {infile_base}.fa'
 khmer_hist = './khmer/scripts/abundance-dist.py'\
@@ -16,19 +16,19 @@ khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genom
             ' {infile_base}.fa {infile_base}_k{k}.dist {khmer_cov}'
 # estimator = './coverage_estimator2.py {infile_base}_k{k}.dist -e {error} -k {k}'
 estimator = './covest.py {infile_base}_k{k}.dist -g -s {infile_base}.fa'\
-            ' -t 100 -T 16 -e {error} -k {k} -c {cov}'
+            ' -t 100 -T 16 -e {error} -k {k} -c {cov} -rp'
 
-path = 'experiment3_1'
+path = 'experiment3_3'
 
 seq_cnt = 5
 error_rates = [0.01, 0.03, 0.05, 0.1]
-# error_rates = [0.01]
-coverages = [0.1, 0.5, 1, 2, 4, 10, 50]
-# coverages = [4]
+#error_rates = [0.03]
+coverages = [0.5, 1, 2, 4, 10, 50]
+#coverages = [0.1]
 ks = [21]
 
-generate = True
-compute_hist = True
+generate = False
+compute_hist = False
 run_khmer = False
 use_jellyfish = True
 VERBOSE = True
