@@ -609,7 +609,7 @@ if __name__ == '__main__':
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
-    parser.add_argument('-m', '--max-coverage', type=int, help='Upper coverage limit')
+    parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
     parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=0,
                         help='Trim histogram automatically with this treshold')
     parser.add_argument('-g', '--grid', action='store_true', default=False,

@@ -22,9 +22,9 @@ khmer_hist = './khmer/scripts/abundance-dist.py'\
 khmer_cov = './khmer-recipes/005-estimate-total-genome-size/estimate-total-genome-size.py'\
             ' {infile} {infile_base}_k{k}.dist {khmer_cov}'
 estimator = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
-            ' -t 100 -T 16 -k {k} -c {cov} -m 700'
+            ' -t 100 -T 16 -k {k} -c {cov} -M 700'
 estimator_r = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
-              ' -t 100 -T 16 -k {k} -c {cov} -rp -m 700'
+              ' -t 100 -T 16 -k {k} -c {cov} -rp -M 700'
 
 path = 'experiment3e'
 
