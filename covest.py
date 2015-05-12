@@ -62,7 +62,7 @@ def get_trim(hist, precision=0):
     return trim
 
 
-def load_dist(fname, autotrim=None, trim=None):
+def load_hist(fname, autotrim=None, trim=None):
     hist = defaultdict(int)
     max_hist = 0
 
@@ -532,7 +532,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
 
 @running_time_decorator
 def main(args):
-    hist = load_dist(
+    hist = load_hist(
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
 
