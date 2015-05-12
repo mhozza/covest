@@ -39,7 +39,7 @@ def verbose_print(message):
 try:
     if not USE_BIGFLOAT:
         raise ImportError("USE_BIGFLOAT is false")
-    from bigfloat import BigFloat, exp
+    from bigfloat import BigFloat, exp, pow
 except ImportError:
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
 
@@ -80,8 +80,8 @@ def load_hist(fname, autotrim=None, trim=None):
         verbose_print('Trimming at: {}'.format(trim))
         hist_l = hist_l[:trim]
     elif trim is not None:
-        hist_l = hist_l[:trim]
-    return hist_l
+        hist_trimed = hist_l[:trim]
+    return hist_l, hist_trimed
 
 
 def count_reads_size(fname):
@@ -175,7 +175,7 @@ class BasicModel:
             try:
                 if exp(l) == 1.0:  # precision fix
                     return 0.0
-                p1 = l ** j
+                p1 = pow(l, j)
                 p2 = self.factorial[j]
                 if l > 1e-8:
                     p3 = exp(l) - 1.0
@@ -532,7 +532,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
 
 @running_time_decorator
 def main(args):
-    hist = load_hist(
+    hist_orig, hist = load_hist(
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
 
@@ -556,7 +556,7 @@ def main(args):
             cov, e, q1, q2, q = args.c, args.e, args.q1, args.q2, args.q
         else:
             # compute guess
-            cov, e = compute_coverage_apx(hist, args.kmer_size, args.read_length)
+            cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
             # We were unable to guess cov and e.
             # Try to estimate from some fixed valid data instead.
             if cov == 0 and e == 1:
