@@ -159,36 +159,24 @@ class BasicModel:
             self.max_error = self.k + 1
         else:
             self.max_error = min(self.k + 1, max_error)
-        self.factorial = [1]
-        for i in range(1, len(hist)):
-            t = self.factorial[-1] * i
-            if USE_BIGFLOAT:
-                t = BigFloat(t)
-            else:
-                t = float(t)
-            self.factorial.append(t)
+        self.log = [INF] + [log(j) for j in range(1, len(hist) + 1)]
+        self.sum_log = [None] + [sum(self.log[1:j+1]) for j in range(1, len(hist))]
 
     def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
     def tr_poisson(self, l, j):
-        with numpy.errstate(over='raise'):  # pylint: disable=E1101
-            try:
-                if exp(l) == 1.0:  # precision fix
-                    return 0.0
-                p1 = pow(l, j)
-                p2 = self.factorial[j]
-                if l > 1e-8:
-                    p3 = exp(l) - 1.0
-                else:
-                    p3 = l
-                res = p1 / (p2 * p3)
-                return float(res)
-            except (OverflowError, FloatingPointError) as e:
-                verbose_print(
-                    'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(l, j, e)
-                )
-                return 0.0
+        # p_{l, j} = (l^j/j!)/(e^l - 1) = (p1 / p2) / p3
+        # compute p1 and p2 in log scale
+        p1 = j*log(l)
+        p2 = self.sum_log[j]
+        # approxiate p3 if l is too low
+        if l > 1e-8:
+            p3 = exp(l) - 1.0
+        else:
+            p3 = l
+        # compute final result
+        return exp(p1-p2) / p3
 
     @lru_cache(maxsize=None)
     def get_lambda_s(self, c, err):
