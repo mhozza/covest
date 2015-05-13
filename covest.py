@@ -7,7 +7,6 @@ from scipy.optimize import minimize
 import argparse
 from inverse import inverse
 import matplotlib.pyplot as plt
-import numpy
 from perf import running_time_decorator, running_time
 from functools import lru_cache
 import json
@@ -97,6 +96,7 @@ def count_reads_size(fname):
     except FileNotFoundError as e:
         verbose_print(e)
 
+
 def compute_coverage_apx(hist, k, r):
     observed_ones = hist[1]
     all_kmers = sum(i * h for i, h in enumerate(hist))
@@ -162,19 +162,20 @@ class BasicModel:
         else:
             self.max_error = min(self.k + 1, max_error)
         self.log = [INF] + [log(j) for j in range(1, len(hist) + 1)]
-        self.sum_log = [None] + [sum(self.log[1:j+1]) for j in range(1, len(hist))]
+        self.sum_log = [None] + [sum(self.log[1:j + 1]) for j in range(1, len(hist))]
 
     def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
     def log_tr_poisson(self, l, j):
         # p_{l, j} = (l^j/j!)/(e^l - 1) = (p1 / p2) / p3
-        # log(p_{l, j}) = log((l^j/j!)/(e^l - 1)) = log((p1 / p2) / p3) = log(p1) - log(p2) - log(p3)
+        # log(p_{l, j}) = log((l^j/j!)/(e^l - 1)) = log((p1 / p2) / p3)
+        #               = log(p1) - log(p2) - log(p3)
         # compute p1 and p2 in log scale
-        p1 = j*log(l)
+        p1 = j * log(l)
         p2 = self.sum_log[j]
         # approxiate p3 if l is too low
-        if l > 1e-8:
+        if exp(l) < 1:
             p3 = log(exp(l) - 1.0)
         else:
             p3 = log(l)
@@ -311,7 +312,8 @@ class RepeatsModel2(BasicModel):
         p_j = [None] + [
             sum(
                 b_o(o) * sum(
-                    a_os[o][s] * exp(self.log_tr_poisson(o * l_s[s], j)) for s in range(self.max_error)
+                    a_os[o][s] * exp(self.log_tr_poisson(o * l_s[s], j))
+                    for s in range(self.max_error)
                 )
                 for o in range(1, treshold_o)
             )
@@ -534,7 +536,10 @@ def main(args):
         model_class = models[args.model]
     else:
         model_class = BasicModel
-    model = model_class(args.kmer_size, args.read_length, hist, max_error=8, max_cov=args.max_coverage)
+    model = model_class(
+        args.kmer_size, args.read_length, hist,
+        max_error=8, max_cov=args.max_coverage,
+    )
 
     orig = [args.coverage, args.error_rate, args.q1, args.q2, args.q]
     if not args.repeats:
