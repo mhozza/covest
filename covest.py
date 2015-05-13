@@ -75,7 +75,7 @@ def load_hist(fname, autotrim=None, trim=None):
             max_hist = max(max_hist, i)
 
     hist_l = [hist[b] for b in range(max_hist)]
-    hist_trimed = hist_l
+    hist_trimed = hist_l[:]
     if autotrim is not None:
         trim = get_trim(hist_l, autotrim)
         verbose_print('Trimming at: {}'.format(trim))
@@ -546,7 +546,7 @@ def main(args):
     else:
         verbose_print('Estimating coverage for {}'.format(args.input_histogram))
         if args.start_original:
-            cov, e, q1, q2, q = args.c, args.e, args.q1, args.q2, args.q
+            cov, e, q1, q2, q = orig
         else:
             # compute guess
             cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
