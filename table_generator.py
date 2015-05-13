@@ -6,7 +6,7 @@ def lines_to_list(header, lines):
     res = list()
     for l in lines:
         res.append(
-            [l[k] for k in header]
+            [l.get(k, None) for k in header]
         )
     return res
 
