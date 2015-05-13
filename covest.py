@@ -39,7 +39,7 @@ def verbose_print(message):
 try:
     if not USE_BIGFLOAT:
         raise ImportError("USE_BIGFLOAT is false")
-    from bigfloat import BigFloat, exp, pow
+    from bigfloat import exp, log
 except ImportError:
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
 
@@ -167,18 +167,19 @@ class BasicModel:
     def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
-    def tr_poisson(self, l, j):
+    def log_tr_poisson(self, l, j):
         # p_{l, j} = (l^j/j!)/(e^l - 1) = (p1 / p2) / p3
+        # log(p_{l, j}) = log((l^j/j!)/(e^l - 1)) = log((p1 / p2) / p3) = log(p1) - log(p2) - log(p3)
         # compute p1 and p2 in log scale
         p1 = j*log(l)
         p2 = self.sum_log[j]
         # approxiate p3 if l is too low
         if l > 1e-8:
-            p3 = exp(l) - 1.0
+            p3 = log(exp(l) - 1.0)
         else:
-            p3 = l
+            p3 = log(l)
         # compute final result
-        return exp(p1-p2) / p3
+        return p1 - p2 - p3
 
     @lru_cache(maxsize=None)
     def get_lambda_s(self, c, err):
@@ -201,7 +202,7 @@ class BasicModel:
         max_hist = len(self.hist)
         p_j = [None] + [
             sum(
-                a_s[s] * self.tr_poisson(l_s[s], j)
+                a_s[s] * exp(self.log_tr_poisson(l_s[s], j))
                 for s in range(self.max_error)
             )
             for j in range(1, max_hist)
@@ -310,7 +311,7 @@ class RepeatsModel2(BasicModel):
         p_j = [None] + [
             sum(
                 b_o(o) * sum(
-                    a_os[o][s] * self.tr_poisson(o * l_s[s], j) for s in range(self.max_error)
+                    a_os[o][s] * exp(self.log_tr_poisson(o * l_s[s], j)) for s in range(self.max_error)
                 )
                 for o in range(1, treshold_o)
             )
@@ -370,11 +371,12 @@ class CoverageEstimator:
 
     def compute_coverage(self, guess, use_grid=True, n_threads=1):
         r = guess
-        res = minimize(
-            self.likelihood_f, r,
-            bounds=self.model.bounds,
-        )
-        r = res.x
+        with running_time('BFGS'):
+            res = minimize(
+                self.likelihood_f, r,
+                bounds=self.model.bounds,
+            )
+            r = res.x
 
         if use_grid:
             verbose_print('Starting grid search with guess: {}'.format(r))
