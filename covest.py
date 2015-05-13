@@ -91,9 +91,11 @@ def count_reads_size(fname):
     fmt = 'fasta'
     if ext == '.fq' or ext == '.fastq':
         fmt = 'fastq'
-    with open(fname, "rU") as f:
-        return sum(len(read) for read in SeqIO.parse(f, fmt))
-
+    try:
+        with open(fname, "rU") as f:
+            return sum(len(read) for read in SeqIO.parse(f, fmt))
+    except FileNotFoundError as e:
+        verbose_print(e)
 
 def compute_coverage_apx(hist, k, r):
     observed_ones = hist[1]
