@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import argparse
+import sys
 import glob
 import os
 import json
@@ -158,42 +159,45 @@ def main(args):
     sequences = set()
 
     for fname in files:
-        seq_name, cov, error, k, ext, ef = parse_fname(fname, err)
-        repeats = ext[-1] == 'r'
-        sequences.add(seq_name)
-        key = (seq_name, cov, error, k, repeats)
+        try:
+            seq_name, cov, error, k, ext, ef = parse_fname(fname, err)
+            repeats = ext[-1] == 'r'
+            sequences.add(seq_name)
+            key = (seq_name, cov, error, k, repeats)
 
-        table_lines[key]['original_coverage'] = cov
-        table_lines[key]['original_error_rate'] = error
-        table_lines[key]['original_k'] = k
-        table_lines[key]['repeats'] = repeats
+            table_lines[key]['original_coverage'] = cov
+            table_lines[key]['original_error_rate'] = error
+            table_lines[key]['original_k'] = k
+            table_lines[key]['repeats'] = repeats
 
-        if ext == '.est' or ext == '.est_r':
-            if args.legacy:
-                d = parse_estimate(fname)
-            else:
-                d = parse_estimate2(fname)
-            if ef:
-                table_lines[key]['estimated_ef_coverage'] = d.get('estimated_coverage', None)
-                table_lines[key]['guessed_ef_coverage'] = d.get('guessed_coverage', None)
-            else:
-                table_lines[key]['estimated_coverage'] = d.get('estimated_coverage', None)
-                table_lines[key]['estimated_error_rate'] = d.get('estimated_error_rate', None)
-                table_lines[key]['estimated_loglikelihood'] = d.get('estimated_loglikelihood', None)
-                table_lines[key]['estimated_q1'] = d.get('estimated_q1', None)
-                table_lines[key]['estimated_q2'] = d.get('estimated_q2', None)
-                table_lines[key]['estimated_q'] = d.get('estimated_q', None)
-                table_lines[key]['guessed_coverage'] = d.get('guessed_coverage', None)
-                table_lines[key]['guessed_error_rate'] = d.get('guessed_error_rate', None)
-                table_lines[key]['guessed_loglikelihood'] = d.get('guessed_loglikelihood', None)
-                table_lines[key]['original_loglikelihood'] = d.get('original_loglikelihood', None)
-                table_lines[key]['estimated_genome_size'] = d.get('estimated_genome_size', None)
+            if ext == '.est' or ext == '.est_r':
+                if args.legacy:
+                    d = parse_estimate(fname)
+                else:
+                    d = parse_estimate2(fname)
+                if ef:
+                    table_lines[key]['estimated_ef_coverage'] = d.get('estimated_coverage', None)
+                    table_lines[key]['guessed_ef_coverage'] = d.get('guessed_coverage', None)
+                else:
+                    table_lines[key]['estimated_coverage'] = d.get('estimated_coverage', None)
+                    table_lines[key]['estimated_error_rate'] = d.get('estimated_error_rate', None)
+                    table_lines[key]['estimated_loglikelihood'] = d.get('estimated_loglikelihood', None)
+                    table_lines[key]['estimated_q1'] = d.get('estimated_q1', None)
+                    table_lines[key]['estimated_q2'] = d.get('estimated_q2', None)
+                    table_lines[key]['estimated_q'] = d.get('estimated_q', None)
+                    table_lines[key]['guessed_coverage'] = d.get('guessed_coverage', None)
+                    table_lines[key]['guessed_error_rate'] = d.get('guessed_error_rate', None)
+                    table_lines[key]['guessed_loglikelihood'] = d.get('guessed_loglikelihood', None)
+                    table_lines[key]['original_loglikelihood'] = d.get('original_loglikelihood', None)
+                    table_lines[key]['estimated_genome_size'] = d.get('estimated_genome_size', None)
 
-        else:
-            if ef:
-                table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
             else:
-                table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
+                if ef:
+                    table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
+                else:
+                    table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
+        except Exception as e:
+            print('Unable to process {}\n{}'.format(fname, e), file=sys.stderr)
 
     # header = [
     #     'original_coverage', 'original_error_rate', 'original_k',
