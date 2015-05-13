@@ -75,11 +75,11 @@ def load_hist(fname, autotrim=None, trim=None):
             max_hist = max(max_hist, i)
 
     hist_l = [hist[b] for b in range(max_hist)]
+    hist_trimed = hist_l
     if autotrim is not None:
         trim = get_trim(hist_l, autotrim)
         verbose_print('Trimming at: {}'.format(trim))
-        hist_l = hist_l[:trim]
-        hist_trimed = hist_l
+        hist_trimed = hist_l[:trim]
     elif trim is not None:
         hist_trimed = hist_l[:trim]
     return hist_l, hist_trimed
