@@ -252,7 +252,7 @@ def main(args):
     #         'estimated_genome_size', 'estimated_genome_size_std',
     #     ]
 
-    header, lines = square_table('original_error_rate', 'orig_coverage', table_lines)
+    header, lines = square_table('original_error_rate', 'original_coverage', table_lines)
 
     print(format_table(
         header,
