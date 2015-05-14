@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from perf import running_time_decorator, running_time
 from functools import lru_cache
 import json
+import numpy
 from math import exp, log
 from multiprocessing import Pool  # pylint: disable=E0611
 import pickle
@@ -38,7 +39,7 @@ def verbose_print(message):
 try:
     if not USE_BIGFLOAT:
         raise ImportError("USE_BIGFLOAT is false")
-    from bigfloat import exp, log
+    from bigfloat import BigFloat, exp, log
 except ImportError:
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
 
@@ -162,29 +163,63 @@ class BasicModel:
         else:
             self.max_error = min(self.k + 1, max_error)
         self.log = [INF] + [log(j) for j in range(1, len(hist) + 1)]
-        self.sum_log = [None] + [sum(self.log[1:j + 1]) for j in range(1, len(hist))]
+
+        self.factorial = [1]
+        self.sum_log = [0]
+        for i in range(1, len(hist)):
+            t = self.factorial[-1] * i
+            if USE_BIGFLOAT:
+                t = BigFloat(t)
+            else:
+                t = float(t)
+            self.factorial.append(t)
+            self.sum_log.append(self.sum_log[-1] + self.log[i])
+
+        # print(self.log)
+        # print(self.sum_log)
 
     def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
     def tr_poisson(self, l, j):
+        with numpy.errstate(over='raise'):  # pylint: disable=E1101
+            try:
+                if exp(l) == 1.0:  # precision fix
+                    return 0.0
+                p1 = pow(l, j)
+                p2 = self.factorial[j]
+                if l > 1e-8:
+                    p3 = exp(l) - 1.0
+                else:
+                    p3 = l
+                res = p1 / (p2 * p3)
+                return float(res)
+            except (OverflowError, FloatingPointError) as e:
+                verbose_print(
+                    'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(l, j, e)
+                )
+                return 0.0
+
+    def tr_poisson_bad(self, l, j):
         # p_{l, j} = (l^j/j!)/(e^l - 1) = (p1 / p2) / p3
         # log(p_{l, j}) = log((l^j/j!)/(e^l - 1)) = log((p1 / p2) / p3)
         #               = log(p1) - log(p2) - log(p3)
-        # compute p1 and p2 in log scale
-        p1 = j * log(l)
-        p2 = self.sum_log[j]
-        # approxiate p3 if l is too low
         try:
-            if exp(l) < 1:
+            # compute p1 and p2 in log scale
+            p1 = j * log(l)
+            p2 = self.sum_log[j]
+            # approxiate p3 if l is too low
+            if exp(l) < 1.0:
                 p3 = log(exp(l) - 1.0)
             else:
                 p3 = log(l)
             # compute final result
+            print(l, j, p1, p2, p3)
             return exp(p1 - p2 - p3)
-        except OverflowError as e:
-            # verbose_print('Overflow at l: {}, j: {}\n{}'.format(l, j, e))
-            return 0
+        except (OverflowError, ValueError) as e:
+            verbose_print('Error at l: {}, j: {}\n{}'.format(l, j, e))
+            raise e
+            return 0.0
 
     @lru_cache(maxsize=None)
     def get_lambda_s(self, c, err):
