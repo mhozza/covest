@@ -260,6 +260,7 @@ def main(args):
         lines,
         template_file=format_templates[args.format],
         escape=format_escape.get(args.format, None),
+        list=True,
     ))
 
 
