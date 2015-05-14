@@ -181,8 +181,8 @@ class BasicModel:
             else:
                 p3 = log(l)
         except OverflowError as e:
-            verbose_print('Overflow at l: {}, j: {}\n{}'.format(l, j, e))
-            return 0
+            # verbose_print('Overflow at l: {}, j: {}\n{}'.format(l, j, e))
+            return -INF
         # compute final result
         return p1 - p2 - p3
 
