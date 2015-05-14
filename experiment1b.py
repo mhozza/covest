@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 import os
 import subprocess
+import argparse
 from copy import deepcopy
 
 source = 'data/chr14.fa'
@@ -11,10 +12,10 @@ source = 'data/prame-partial-hg38.fa'
 simulator = 'art_bin_VanillaIceCream/art_illumina -i {src} -o {infile_base} -f {cov} -l 100 -ef'
 simulator_ef = './sam_to_fasta.py {infile_base}_errFree.sam'
 simulator_simple = './read_simulator.py {src} {infile_base}.fa'\
-            ' -f {infile_base_ef}.fa -e 0.03 -c {cov}'
+                   ' -f {infile_base_ef}.fa -e 0.03 -c {cov}'
 
-jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o table.jf'
-jellyfish_hist = 'jellyfish histo table.jf_0 -o {infile_base}_k{k}.dist'
+jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o {seq_name}.jf'
+jellyfish_hist = 'jellyfish histo {seq_name}.jf_0 -o {infile_base}_k{k}.dist'
 khmer_count = './khmer/scripts/load-into-counting.py -x 2e9 -n 6'\
               ' -k {k} hash_table.kh {infile}'
 khmer_hist = './khmer/scripts/abundance-dist.py'\
@@ -26,19 +27,17 @@ estimator = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
 estimator_r = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
               ' -t 100 -T 16 -k {k} -c {cov} -rp -M 700'
 
-path = 'experiment3e'
-
 coverages = [0.5, 1, 4, 10, 50]
 # coverages = [4, 10]
 ks = [21]
 
 USE_SIMPLE_SIMULATOR = True
-generate = True
-generate_dist = generate
+generate = False
+generate_dist = True
 use_jellyfish = True
 ef = False
 run_khmer = False
-run_rep = False
+run_rep = True
 run_norep = False
 
 
@@ -49,6 +48,11 @@ def run(command, output=None):
     return subprocess.call(command.split(), stdout=f)
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path')
+    args = parser.parse_args()
+    path = args.path
+
     for c in coverages:
         params = {
             'src': source,
