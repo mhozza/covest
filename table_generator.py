@@ -42,9 +42,9 @@ def format_table(header, titles, lines, template_file, escape=None, round_floats
 
 
 def square_table(x, y, k, data):
-    x_vals = list(set(v[x] for v in data.values()))
-    y_vals = set(v[y] for v in data.values())
-    table = [[''] + x_vals]
+    x_vals = sorted(list(set(v[x] for v in data.values())))
+    y_vals = sorted(list(set(v[y] for v in data.values())))
+    table = []
     for yv in y_vals:
         line = [yv]
         for xv in x_vals:
@@ -53,4 +53,4 @@ def square_table(x, y, k, data):
                     line.append(v[k])
                     break
         table.append(line)
-    return x_vals, table
+    return [''] + x_vals, table
