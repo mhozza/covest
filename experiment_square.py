@@ -5,7 +5,7 @@ import glob
 import os
 import json
 from collections import defaultdict
-from table_generator import format_table
+from table_generator import format_table, square_table
 
 SEPARATE_EF = True
 
