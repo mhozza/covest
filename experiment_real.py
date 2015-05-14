@@ -14,8 +14,8 @@ simulator_ef = './sam_to_fasta.py {infile_base}_errFree.sam'
 simulator_simple = './read_simulator.py {src} {infile_base}.fa'\
                    ' -f {infile_base_ef}.fa -e 0.03 -c {cov}'
 
-jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o {seq_name}.jf'
-jellyfish_hist = 'jellyfish histo {seq_name}.jf_0 -o {infile_base}_k{k}.dist'
+jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o {infile}.jf'
+jellyfish_hist = 'jellyfish histo {infile}.jf_0 -o {infile_base}_k{k}.dist'
 khmer_count = './khmer/scripts/load-into-counting.py -x 2e9 -n 6'\
               ' -k {k} hash_table.kh {infile}'
 khmer_hist = './khmer/scripts/abundance-dist.py'\

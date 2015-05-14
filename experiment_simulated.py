@@ -6,8 +6,8 @@ from copy import deepcopy
 generator = './generate_sequence.py {seq_name}.fa'
 simulator = './read_simulator.py {seq_name}.fa {infile_base}.fa'\
             ' -f {infile_base_ef}.fa -e {error} -c {cov}'
-jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile_base}.fa -o seq_name.jf'
-jellyfish_hist = 'jellyfish histo seq_name.jf_0 -o {infile_base}_k{k}.dist'
+jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile_base}.fa -o {infile_base}.jf'
+jellyfish_hist = 'jellyfish histo {infile_base}.jf_0 -o {infile_base}_k{k}.dist'
 khmer_count = './khmer/scripts/load-into-counting.py -x 1e9'\
               ' -k {k} hash_table.kh {infile_base}.fa'
 khmer_hist = './khmer/scripts/abundance-dist.py'\
