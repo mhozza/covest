@@ -41,7 +41,7 @@ def format_table(header, titles, lines, template_file, escape=None, round_floats
         return pystache.render(template, data)
 
 
-def square_table(x, y, data):
+def square_table(x, y, k, data):
     x_vals = list(set(v[x] for v in data.values()))
     y_vals = set(v[y] for v in data.values())
     table = [[''] + x_vals]
@@ -50,7 +50,7 @@ def square_table(x, y, data):
         for xv in x_vals:
             for v in data.values():
                 if v[x] == xv and v[y] == yv:
-                    line.append(v)
+                    line.append(v[k])
                     break
         table.append(line)
     return x_vals, table
