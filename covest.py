@@ -175,10 +175,14 @@ class BasicModel:
         p1 = j * log(l)
         p2 = self.sum_log[j]
         # approxiate p3 if l is too low
-        if exp(l) < 1:
-            p3 = log(exp(l) - 1.0)
-        else:
-            p3 = log(l)
+        try:
+            if exp(l) < 1:
+                p3 = log(exp(l) - 1.0)
+            else:
+                p3 = log(l)
+        except OverflowError as e:
+            verbose_print('Owerflov at l: {}, j: {}\n{}'.format(l, j, e))
+            return 0
         # compute final result
         return p1 - p2 - p3
 
