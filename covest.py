@@ -85,6 +85,7 @@ def load_hist(fname, autotrim=None, trim=None):
     return hist_l, hist_trimed
 
 
+@lru_cache(maxsize=None)
 def count_reads_size(fname):
     from Bio import SeqIO
     _, ext = path.splitext(fname)
@@ -200,26 +201,26 @@ class BasicModel:
                 )
                 return 0.0
 
-    def tr_poisson_bad(self, l, j):
-        # p_{l, j} = (l^j/j!)/(e^l - 1) = (p1 / p2) / p3
-        # log(p_{l, j}) = log((l^j/j!)/(e^l - 1)) = log((p1 / p2) / p3)
-        #               = log(p1) - log(p2) - log(p3)
-        try:
-            # compute p1 and p2 in log scale
-            p1 = j * log(l)
-            p2 = self.sum_log[j]
-            # approxiate p3 if l is too low
-            if exp(l) < 1.0:
-                p3 = log(exp(l) - 1.0)
-            else:
-                p3 = log(l)
-            # compute final result
-            print(l, j, p1, p2, p3)
-            return exp(p1 - p2 - p3)
-        except (OverflowError, ValueError) as e:
-            verbose_print('Error at l: {}, j: {}\n{}'.format(l, j, e))
-            raise e
-            return 0.0
+    # def tr_poisson_bad(self, l, j):
+    #     # p_{l, j} = (l^j/j!)/(e^l - 1) = (p1 / p2) / p3
+    #     # log(p_{l, j}) = log((l^j/j!)/(e^l - 1)) = log((p1 / p2) / p3)
+    #     #               = log(p1) - log(p2) - log(p3)
+    #     try:
+    #         # compute p1 and p2 in log scale
+    #         p1 = j * log(l)
+    #         p2 = self.sum_log[j]
+    #         # approxiate p3 if l is too low
+    #         if exp(l) < 1.0:
+    #             p3 = log(exp(l) - 1.0)
+    #         else:
+    #             p3 = log(l)
+    #         # compute final result
+    #         print(l, j, p1, p2, p3)
+    #         return exp(p1 - p2 - p3)
+    #     except (OverflowError, ValueError) as e:
+    #         verbose_print('Error at l: {}, j: {}\n{}'.format(l, j, e))
+    #         raise e
+    #         return 0.0
 
     @lru_cache(maxsize=None)
     def get_lambda_s(self, c, err):

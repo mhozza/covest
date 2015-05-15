@@ -3,6 +3,7 @@ import argparse
 from collections import defaultdict
 from table_generator import format_table
 from experiment_parser import parse_all
+from covest import count_reads_size
 
 SEPARATE_EF = True
 
@@ -52,27 +53,15 @@ def compute_average(table_lines, std_key_suffix='_std'):
 def main(args):
     table_lines = parse_all(args.path, args.filter, not args.no_error, legacy=args.legacy)
 
-    # header = [
-    #     'original_coverage', 'original_error_rate', 'original_k',
-    #     'estimated_coverage', 'estimated_error_rate',
-    #     'estimated_ef_coverage',
-    #     'guessed_coverage', 'guessed_error_rate', 'guessed_ef_coverage',
-    #     'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
-    #     'khmer_coverage',
-    #     'khmer_ef_coverage',
-    # ]
-
-    # header = [
-    #     'original_coverage', 'repeats',
-    #     'estimated_coverage', 'estimated_error_rate',
-    #     'estimated_q1', 'estimated_q2', 'estimated_q',
-    #     'guessed_coverage', 'guessed_error_rate',
-    #     'estimated_loglikelihood', 'guessed_loglikelihood',
-    # ]
+    for k, v in table_lines:
+        # for simulated:
+        read_file = '{seq_name}_c{original_coverage}_e{original_error_rate}.fa'.format(**v)
+        rc = count_reads_size(read_file)
+        v['williams_coverage'] = int(round(rc / v['williams_genome_size']))
 
     header = [
         'original_coverage', 'original_error_rate',
-        'estimated_coverage', 'estimated_error_rate',
+        'williams_coverage', 'williams_genome_size',
     ]
 
     format_templates = {
@@ -130,6 +119,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--average', action='store_true',
                         help='Compute average from all sequences')
     parser.add_argument('-ne', '--no-error', action='store_true', help='Error is unknown')
+    parser.add_argument('-r', '--read-size', action='store_true', help='Error is unknown')
     parser.add_argument('--legacy', action='store_true', help='Run in legacy mode')
     args = parser.parse_args()
     main(args)
