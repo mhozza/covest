@@ -56,7 +56,10 @@ def main(args):
     for k, v in table_lines.items():
         read_file = v['fname'][:v['fname'].find('_k21')] + '.fa'
         rc = count_reads_size(read_file)
-        v['williams_coverage'] = int(round(rc / v['williams_genome_size']))
+        try:
+            v['williams_coverage'] = int(round(rc / v['williams_genome_size']))
+        except ZeroDivisionError:
+            v['williams_coverage'] = None
 
     header = [
         'original_coverage', 'original_error_rate',
