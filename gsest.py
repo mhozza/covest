@@ -8,7 +8,7 @@ def main(args):
     if args.coverage:
         print('Genome size:', int(round(rc / args.coverage)))
     if args.genome_size:
-        print('Genome size:', int(round(rc / args.genome_size)))
+        print('Coverage:', rc / args.genome_size)
 
 
 if __name__ == '__main__':
