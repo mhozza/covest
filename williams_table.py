@@ -54,8 +54,7 @@ def main(args):
     table_lines = parse_all(args.path, args.filter, not args.no_error, legacy=args.legacy)
 
     for k, v in table_lines.items():
-        # for simulated:
-        read_file = '{seq_name}_c{original_coverage}_e{original_error_rate}.fa'.format(**v)
+        read_file = v['fname'][:v['fname'].find('_k21')] + '.fa'
         rc = count_reads_size(read_file)
         v['williams_coverage'] = int(round(rc / v['williams_genome_size']))
 
