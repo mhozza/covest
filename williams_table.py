@@ -57,7 +57,7 @@ def main(args):
         read_file = v['fname'][:v['fname'].find('_k21')] + '.fa'
         rc = count_reads_size(read_file)
         try:
-            v['williams_coverage'] = int(round(rc / v['williams_genome_size']))
+            v['williams_coverage'] = rc / v['williams_genome_size']
         except ZeroDivisionError:
             v['williams_coverage'] = None
 
