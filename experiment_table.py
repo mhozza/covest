@@ -53,6 +53,7 @@ def main(args):
     table_lines = parse_all(args.path, args.filter, not args.no_error, legacy=args.legacy)
 
     header = [
+        'seq_name',
         'original_coverage', 'original_error_rate', 'original_k',
         'estimated_coverage', 'estimated_error_rate',
         'estimated_genome_size',
@@ -118,6 +119,7 @@ def main(args):
                 x['original_error_rate'],
                 x['original_k'],
                 x.get('repeats', False),
+                x['seq_name'],
             )
         ),
         template_file=format_templates[args.format],
