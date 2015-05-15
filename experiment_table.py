@@ -52,28 +52,36 @@ def compute_average(table_lines, std_key_suffix='_std'):
 def main(args):
     table_lines = parse_all(args.path, args.filter, not args.no_error, legacy=args.legacy)
 
-    # header = [
-    #     'original_coverage', 'original_error_rate', 'original_k',
-    #     'estimated_coverage', 'estimated_error_rate',
-    #     'estimated_ef_coverage',
-    #     'guessed_coverage', 'guessed_error_rate', 'guessed_ef_coverage',
-    #     'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
-    #     'khmer_coverage',
-    #     'khmer_ef_coverage',
-    # ]
-
-    # header = [
-    #     'original_coverage', 'repeats',
-    #     'estimated_coverage', 'estimated_error_rate',
-    #     'estimated_q1', 'estimated_q2', 'estimated_q',
-    #     'guessed_coverage', 'guessed_error_rate',
-    #     'estimated_loglikelihood', 'guessed_loglikelihood',
-    # ]
-
     header = [
-        'original_coverage', 'original_error_rate',
+        'original_coverage', 'original_error_rate', 'original_k',
         'estimated_coverage', 'estimated_error_rate',
+        'estimated_genome_size',
+        'estimated_q1', 'estimated_q2', 'estimated_q',
+        'guessed_coverage', 'guessed_error_rate',
+        'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
     ]
+
+    header_avg = [
+        'original_coverage',
+        'original_error_rate',
+        'original_k',
+        'estimated_coverage', 'estimated_coverage_std',
+        'estimated_error_rate', 'estimated_error_rate_std',
+        'estimated_genome_size', 'estimated_genome_size_std',
+        'estimated_q1', 'estimated_q1_std',
+        'estimated_q2', 'estimated_q2_std',
+        'estimated_q', 'estimated_q_std',
+        'guessed_coverage', 'guessed_coverage_std',
+        'guessed_error_rate', 'guessed_error_rate_std',
+        'original_loglikelihood', 'original_loglikelihood_std',
+        'estimated_loglikelihood', 'estimated_loglikelihood_std',
+        'guessed_loglikelihood', 'guessed_loglikelihood_std',
+    ]
+
+    # header = [
+    #     'original_coverage', 'original_error_rate',
+    #     'estimated_coverage', 'estimated_error_rate',
+    # ]
 
     format_templates = {
         'html': 'templates/html.tpl',
@@ -98,12 +106,7 @@ def main(args):
 
     if args.average:
         table_lines = compute_average(table_lines)
-        header = [
-            'original_coverage', 'original_error_rate',
-            'estimated_coverage', 'estimated_coverage_std',
-            'estimated_error_rate', 'estimated_error_rate_std',
-            'estimated_genome_size', 'estimated_genome_size_std',
-        ]
+        header = header_avg
 
     print(format_table(
         header,
