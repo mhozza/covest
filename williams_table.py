@@ -53,7 +53,7 @@ def compute_average(table_lines, std_key_suffix='_std'):
 def main(args):
     table_lines = parse_all(args.path, args.filter, not args.no_error, legacy=args.legacy)
 
-    for k, v in table_lines:
+    for k, v in table_lines.items():
         # for simulated:
         read_file = '{seq_name}_c{original_coverage}_e{original_error_rate}.fa'.format(**v)
         rc = count_reads_size(read_file)
@@ -119,7 +119,6 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--average', action='store_true',
                         help='Compute average from all sequences')
     parser.add_argument('-ne', '--no-error', action='store_true', help='Error is unknown')
-    parser.add_argument('-r', '--read-size', action='store_true', help='Error is unknown')
     parser.add_argument('--legacy', action='store_true', help='Run in legacy mode')
     args = parser.parse_args()
     main(args)
