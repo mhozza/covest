@@ -27,17 +27,17 @@ estimator = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
 estimator_r = './covest.py {infile_base}_k{k}.dist -g -s {infile}'\
               ' -t 100 -T 16 -k {k} -c {cov} -rp -M 700'
 
-coverages = [0.5, 1, 4, 10, 50]
+coverages = [0.5, 1, 2, 4, 10, 30, 50]
 # coverages = [4, 10]
 ks = [21]
 
-USE_SIMPLE_SIMULATOR = True
+USE_SIMPLE_SIMULATOR = False
 generate = False
 generate_dist = True
 use_jellyfish = True
 ef = False
 run_khmer = False
-run_rep = True
+run_rep = False
 run_norep = False
 
 
@@ -60,7 +60,7 @@ if __name__ == '__main__':
             'khmer_cov': max(1, int(c)),
         }
         infile_base = os.path.join(
-            path, 'experiment1_c{cov}'.format(**params)
+            path, 'ecoli-c{cov}'.format(**params)
         )
 
         if USE_SIMPLE_SIMULATOR:
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         else:
             params['infile_base'] = infile_base
             params['infile_base_ef'] = infile_base + 'f'
-            params['infile'] = '{}.fq'.format(params['infile_base'])
+            params['infile'] = '{}.fastq'.format(params['infile_base'])
             params['infile_ef'] = '{}_errFree.fa'.format(params['infile_base'])
 
         if generate:
