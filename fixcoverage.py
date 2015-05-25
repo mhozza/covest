@@ -2,11 +2,11 @@
 import argparse
 
 
-def correct_c(self, c, r=100, k=21):
+def correct_c(c, r=100, k=21):
     return c * (r - k + 1) / r
 
 
-def correct_ck(self, c, r=151, k=21):
+def correct_ck(c, r=151, k=21):
     return c * r / (r - k + 1)
 
 
