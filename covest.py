@@ -21,7 +21,7 @@ from os import path
 DEFAULT_K = 21
 DEFAULT_READ_LENGTH = 100
 DEFAULT_THREAD_COUNT = 4
-DEFAULT_REPEAT_MODEL = 1
+DEFAULT_REPEAT_MODEL = 0
 
 # config
 VERBOSE = True
@@ -297,9 +297,9 @@ class BasicModel:
         plt.show()
 
 
-class RepeatsModel2(BasicModel):
+class RepeatsModel(BasicModel):
     def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
-        super(RepeatsModel2, self).__init__(k, r, hist, max_error)
+        super(RepeatsModel, self).__init__(k, r, hist, max_error)
         self.repeats = False
         self.bounds = ((0.0, max_cov), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
         self.treshold = treshold
@@ -356,45 +356,6 @@ class RepeatsModel2(BasicModel):
                     for s in range(self.max_error)
                 )
                 for o in range(1, treshold_o)
-            )
-            for j in range(1, len(self.hist))
-        ]
-        return p_j
-
-
-class RepeatsModel(RepeatsModel2):
-    @lru_cache(maxsize=None)
-    def compute_repeat_table(self, c, err, treshold_o):
-        p_j = super(RepeatsModel2, self).compute_probabilities(c, err)  # pylint: disable=E1003
-        p_oj = [
-            [None], p_j
-        ]
-
-        hist_size = len(self.hist)
-        if treshold_o is None:
-            treshold_o = hist_size
-
-        for o in range(2, treshold_o):
-            p = [[None]]
-            for j in range(1, hist_size):
-                res = 0.0
-                for i in range(1, j):
-                    t = p_oj[1][i] * p_oj[o - 1][j - i]
-                    res += t
-                p.append(res)
-            p_oj.append(p)
-
-        return p_oj
-
-    def compute_probabilities(self, c, err, q1, q2, q):
-        b_o = self.get_b_o(q1, q2, q)
-        treshold_o = self.get_hist_treshold(b_o, self.treshold)
-        p_oj = self.compute_repeat_table(c, err, treshold_o)
-
-        p_j = [0] + [
-            sum(
-                b_o(o) * p_oj[o][j]
-                for o in range(1, min(j + 1, treshold_o))
             )
             for j in range(1, len(self.hist))
         ]
@@ -571,7 +532,7 @@ def main(args):
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
 
-    models = [RepeatsModel, RepeatsModel2]
+    models = [RepeatsModel]
     if args.repeats:
         model_class = models[args.model]
     else:
