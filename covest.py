@@ -231,9 +231,9 @@ class BasicModel:
 
     def compute_probabilities(self, c, err, *_):
         # read to kmer coverage
-        c = self.correct_c(c)
+        ck = self.correct_c(c)
         # lambda for kmers with s errors
-        l_s = self.get_lambda_s(c, err)
+        l_s = self.get_lambda_s(ck, err)
         # expected probability of kmers with s errors and coverage >= 1
         n_s = [self.comb[s] * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(self.max_error)]
         sum_n_s = fix_zero(sum(n_s[t] for t in range(self.max_error)))
@@ -260,6 +260,93 @@ class BasicModel:
             for j in range(1, len(self.hist))
             if self.hist[j]
         ))
+
+    def der_correct_c(self, var, *args):
+        if var == 0:
+            return (self.r - self.k + 1) / self.r
+        else:
+            return 0
+
+    def der_l(self, var, s, *args):
+        c, err = args[:2]
+        if var == 0:
+            return self.der_correct_c(
+                var, *args
+            ) * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s
+        if var == 1:
+            return self.correct_c(c) * (3 ** -s) * (
+                s * err ** (s - 1) * (1.0 - err) ** (self.k - s)
+                + err ** s * (s - self.k) * (1.0 - err) ** (self.k - s - 1)
+            )
+        else:
+            return 0
+
+    def der_tr_poisson(self, var, s, l_s, j, *args):
+        with numpy.errstate(over='raise'):  # pylint: disable=E1101
+            try:
+                if exp(l_s[s]) == 1.0:  # precision fix
+                    return 0.0
+                p2 = self.factorial[j]
+                if l_s[s] > 1e-8:
+                    p3 = exp(l_s[s]) - 1.0
+                else:
+                    p3 = l_s[s]
+                p4 = p2 * p3
+                p1 = pow(l_s[s], j - 1) * self.der_l(var, s, *args) * (
+                    j * p4 - l_s[s] * exp(l_s[s])
+                )
+                res = p1 / (p4 * p4)
+                return float(res)
+            except (OverflowError, FloatingPointError) as e:
+                verbose_print(
+                    'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
+                        l_s[s], j, e
+                    )
+                )
+                return 0.0
+
+    def der_n(self, var, s, l_s, *args):
+        return - self.comb[s] * (3 ** s) * exp(-l_s[s]) * self.der_l_c(s, *args)
+
+    def der_a(self, var, s, n_s, sum_n_s, l_s, *args):
+        return (
+            self.der_n(var, s, l_s, *args) * sum_n_s - n_s[s] * sum(
+                self.der_n(var, s, l_s, *args)
+                for s in range(self.max_error)
+            )
+        ) / (sum_n_s * sum_n_s)
+
+    def der_p(self, var, j, *args):
+        c, err = args[:2]
+        # read to kmer coverage
+        ck = self.correct_c(c)
+        # lambda for kmers with s errors
+        l_s = self.get_lambda_s(ck, err)
+        # expected probability of kmers with s errors and coverage >= 1
+        n_s = [self.comb[s] * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(self.max_error)]
+        sum_n_s = fix_zero(sum(n_s[t] for t in range(self.max_error)))
+        # portion of kmers with s errors
+        a_s = [n_s[s] / sum_n_s for s in range(self.max_error)]
+        # probability that unique kmer has coverage j (j > 0)
+        return sum(
+            self.der_a(
+                var, s, n_s, sum_n_s, *args
+            ) * self.tr_poisson(l_s[s], j) + a_s[s] * self.der_tr_poisson(
+                var, s, l_s, j, *args
+            )
+            for s in range(self.max_error)
+        )
+
+    def der_likelihood(self, var, *args):
+        p_j = self.compute_probabilities(*args)
+        return sum(
+            self.hist[j] * self.der_p(var, j, *args) / p_j[j]
+            for j in range(1, len(self.hist))
+            if self.hist[j]
+        )
+
+    def gradient(self, *args):
+        return [der_likelihood(var, *args) for var in range(len(args))]
 
     def plot_probs(self, est, guess, orig):
         def fmt(p):
