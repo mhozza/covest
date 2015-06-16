@@ -3,7 +3,8 @@ import sys
 import itertools
 from collections import defaultdict
 from scipy.misc import comb
-from scipy.optimize import minimize, approx_fprime
+from scipy.optimize import minimize
+from scipy.optimize import approx_fprime
 import argparse
 from inverse import inverse
 import matplotlib.pyplot as plt
@@ -368,7 +369,7 @@ class BasicModel:
         res = [self.der_likelihood(var, *args) for var in range(len(args))]
         # f = lambda x: self.compute_loglikelihood(*x)
         # res2 = approx_fprime(args, f, 1e-8)
-        # verbose_print('{} vs. {}'.format(res, res2))
+        verbose_print('{}'.format(res))
 
         return res
 
@@ -441,36 +442,66 @@ class RepeatsModel(BasicModel):
     def compute_probabilities(self, c, err, q1, q2, q):  # pylint: disable=W0221
         b_o = self.get_b_o(q1, q2, q)
         treshold_o = self.get_hist_treshold(b_o, self.treshold)
-        # read to kmer coverage
-        c = self.correct_c(c)
-        # lambda for kmers with s errors
-        l_s = self.get_lambda_s(c, err)
-        # expected probability of kmers with s errors and coverage >= 1
-        n_os = [None] + [
-            [self.comb[s] * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(self.max_error)]
-            for o in range(1, treshold_o)
-        ]
-        sum_n_os = [None] + [
-            fix_zero(sum(n_os[o][t] for t in range(self.max_error))) for o in range(1, treshold_o)
-        ]
-
-        # portion of kmers wit1h s errors
-        a_os = [None] + [
-            [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(self.max_error)]
-            for o in range(1, treshold_o)
-        ]
-        # probability that unique kmer has coverage j (j > 0)
+        p_o_j = [None] + [super(RepeatsModel, self).compute_probabilities(c * o, err) for o in range(1, treshold_o)]
         p_j = [None] + [
             sum(
-                b_o(o) * sum(
-                    a_os[o][s] * self.tr_poisson(o * l_s[s], j)
-                    for s in range(self.max_error)
-                )
+                b_o(o) * p_o_j[o][j]
                 for o in range(1, treshold_o)
             )
             for j in range(1, len(self.hist))
         ]
         return p_j
+
+    def der_b_o(self, var, *args):
+        q1, q2, q = args[2:5]
+
+        def b_o(o):
+            if var < 2 or o == 0:
+                return 0
+            elif o == 1:
+                return 1 if var == 2 else 0
+            elif o == 2:
+                return -q2 if var == 2 else (1 - q1) if var == 3 else 0
+            else:
+                if var == 4:
+                    return (1 - q1) * (1 - q2) * ((1 - q) ** (o - 3) - q * (o - 3) * (1 - q) ** (o - 4))
+                else:
+                    t = q2 if var == 2 else q1
+                    return -(1 - t) * q * (1 - q) ** (o - 3)
+        return b_o
+
+    def der_p_o_j(self, var, o, j, *args):
+        args = list(args)
+        args[0] = o * args[0]
+        return super(RepeatsModel, self).der_p(var, j, *args)
+
+    def der_p(self, var, j, *args):
+        c, err, q1, q2, q = args[:5]
+        b_o = self.get_b_o(q1, q2, q)
+        treshold_o = self.get_hist_treshold(b_o, self.treshold)
+        if var < 2:
+            res = sum(
+                b_o(o) * self.der_p_o_j(var, o, j, *args)
+                for o in range(1, treshold_o)
+            )
+        else:
+            der_b_o = self.der_b_o(var, *args)
+            p_o_j = [None] + [super(RepeatsModel, self).compute_probabilities(c * o, err) for o in range(1, treshold_o)]
+            res = sum(
+                der_b_o(o) * p_o_j[o][j]
+                for o in range(1, treshold_o)
+            )
+        return res
+
+    def gradient(self, *args):
+        verbose_print('Computing gradient, {}'.format(args))
+        res = [self.der_likelihood(var, *args) for var in range(len(args))]
+        f = lambda x: self.compute_loglikelihood(*x)
+        res2 = approx_fprime(args, f, 1e-8)
+
+        # verbose_print('{}'.format(res))
+        verbose_print('{} : {}'.format(res, res2))
+        return res
 
 
 class CoverageEstimator:
