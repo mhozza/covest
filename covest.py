@@ -3,7 +3,7 @@ import sys
 import itertools
 from collections import defaultdict
 from scipy.misc import comb
-from scipy.optimize import minimize
+from scipy.optimize import minimize, approx_fprime
 import argparse
 from inverse import inverse
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ from math import exp, log
 from multiprocessing import Pool  # pylint: disable=E0611
 import pickle
 from os import path
-# from utils import print_wrap as pw
+from utils import print_wrap as pw
 
 # defaults
 DEFAULT_K = 21
@@ -156,7 +156,7 @@ class BasicModel:
         self.repeats = False
         self.k = k
         self.r = r
-        self.bounds = ((0.0, max_cov), (0.0, 1.0))
+        self.bounds = ((0.01, max_cov), (0.0, 0.5))
         self.comb = [comb(k, s) for s in range(k + 1)]
         self.hist = hist
         if max_error is None:
@@ -185,8 +185,8 @@ class BasicModel:
     def tr_poisson(self, l, j):
         with numpy.errstate(over='raise'):  # pylint: disable=E1101
             try:
-                if exp(l) == 1.0:  # precision fix
-                    return 0.0
+                # if exp(l) == 1.0:  # precision fix
+                #     return 0.0
                 p1 = pow(l, j)
                 p2 = self.factorial[j]
                 if l > 1e-8:
@@ -269,33 +269,38 @@ class BasicModel:
 
     def der_l(self, var, s, *args):
         c, err = args[:2]
+        # verbose_print('der_l: {} {} {} {}'.format(var, s, args, self.der_correct_c(0, *args)))
         if var == 0:
-            return self.der_correct_c(
+            nzs = err ** s * (3 ** -s) if err > 0 else 0
+            res = self.der_correct_c(
                 var, *args
-            ) * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s
-        if var == 1:
-            return self.correct_c(c) * (3 ** -s) * (
-                s * err ** (s - 1) * (1.0 - err) ** (self.k - s)
-                + err ** s * (s - self.k) * (1.0 - err) ** (self.k - s - 1)
-            )
+            ) * (1.0 - err) ** (self.k - s) * nzs
+            # verbose_print('{} {} {}'.format(res, nzs, (1.0 - err) ** (self.k - s)))
+        elif var == 1:
+            if s > 0:
+                res = - self.correct_c(c) * (3 ** - s) * err ** (s - 1) * (1 - err) ** (self.k - s - 1) * (self.k * err - s)
+            else:
+                res = - self.correct_c(c) * self.k * (1 - err) ** (self.k - 1)
+            # verbose_print('{} {} {} {}'.format(res, nzs, err ** s * (s - self.k) * (1.0 - err) ** (self.k - s - 1), self.correct_c(c) * (3 ** -s) ))
         else:
-            return 0
+            res = 0
+
+        return res
 
     def der_tr_poisson(self, var, s, l_s, j, *args):
-        with numpy.errstate(over='raise'):  # pylint: disable=E1101
+        with numpy.errstate(over='raise', divide='raise'):  # pylint: disable=E1101
             try:
-                if exp(l_s[s]) == 1.0:  # precision fix
-                    return 0.0
+                # if exp(l_s[s]) == 1.0:  # precision fix
+                #     return 0.0
                 p2 = self.factorial[j]
                 if l_s[s] > 1e-8:
                     p3 = exp(l_s[s]) - 1.0
                 else:
                     p3 = l_s[s]
-                p4 = p2 * p3
-                p1 = pow(l_s[s], j - 1) * self.der_l(var, s, *args) * (
-                    j * p4 - l_s[s] * exp(l_s[s])
-                )
-                res = p1 / (p4 * p4)
+                p1 = j * self.der_l(var, s, *args) * p3 * pow(l_s[s], j - 1) - pow(l_s[s], j) * exp(l_s[s]) * self.der_l(var, s, *args)
+                # verbose_print('der_trp {} {} {}'.format(p1, p2, p3))
+                res = p1 / (p2 * p3 * p3)
+                # verbose_print('ok')
                 return float(res)
             except (OverflowError, FloatingPointError) as e:
                 verbose_print(
@@ -306,17 +311,20 @@ class BasicModel:
                 return 0.0
 
     def der_n(self, var, s, l_s, *args):
-        return - self.comb[s] * (3 ** s) * exp(-l_s[s]) * self.der_l_c(s, *args)
+        res = self.comb[s] * (3 ** s) * exp(-l_s[s]) * self.der_l(var, s, *args)
+        return res
 
     def der_a(self, var, s, n_s, sum_n_s, l_s, *args):
-        return (
+        res = (
             self.der_n(var, s, l_s, *args) * sum_n_s - n_s[s] * sum(
                 self.der_n(var, s, l_s, *args)
                 for s in range(self.max_error)
             )
         ) / (sum_n_s * sum_n_s)
+        return res
 
     def der_p(self, var, j, *args):
+        # verbose_print('Cpmuting der_p: {} {} {}'.format(var, j, args))
         c, err = args[:2]
         # read to kmer coverage
         ck = self.correct_c(c)
@@ -328,25 +336,41 @@ class BasicModel:
         # portion of kmers with s errors
         a_s = [n_s[s] / sum_n_s for s in range(self.max_error)]
         # probability that unique kmer has coverage j (j > 0)
-        return sum(
+        res = sum(
             self.der_a(
-                var, s, n_s, sum_n_s, *args
+                var, s, n_s, sum_n_s, l_s, *args
             ) * self.tr_poisson(l_s[s], j) + a_s[s] * self.der_tr_poisson(
                 var, s, l_s, j, *args
             )
             for s in range(self.max_error)
         )
+        # verbose_print('{}'.format(res))
+        return res
 
     def der_likelihood(self, var, *args):
+        # verbose_print('Computing der_ll: {} {}'.format(var, args))
         p_j = self.compute_probabilities(*args)
-        return sum(
-            self.hist[j] * self.der_p(var, j, *args) / p_j[j]
+
+        def col(j):
+            res = self.hist[j] * self.der_p(var, j, *args) / p_j[j]
+            return res
+
+        res = sum(
+            # pw(pw(self.hist[j], 'hist') * pw(self.der_p(var, j, *args), 'top') / pw(p_j[j], 'bottom'), 'res') if j == 1 else
+            col(j)
             for j in range(1, len(self.hist))
             if self.hist[j]
         )
+        return res
 
     def gradient(self, *args):
-        return [der_likelihood(var, *args) for var in range(len(args))]
+        verbose_print('Computing gradient, {}'.format(args))
+        res = [self.der_likelihood(var, *args) for var in range(len(args))]
+        # f = lambda x: self.compute_loglikelihood(*x)
+        # res2 = approx_fprime(args, f, 1e-8)
+        # verbose_print('{} vs. {}'.format(res, res2))
+
+        return res
 
     def plot_probs(self, est, guess, orig):
         def fmt(p):
@@ -388,7 +412,7 @@ class RepeatsModel(BasicModel):
     def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
         super(RepeatsModel, self).__init__(k, r, hist, max_error)
         self.repeats = False
-        self.bounds = ((0.0, max_cov), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
+        self.bounds = ((0.01, max_cov), (0.0, 0.99), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
         self.treshold = treshold
 
     def get_hist_treshold(self, b_o, treshold):
@@ -459,14 +483,22 @@ class CoverageEstimator:
             x = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(x)]
         return -self.model.compute_loglikelihood(*x)
 
-    def compute_coverage(self, guess, use_grid=True, n_threads=1):
+    def compute_coverage(self, guess, use_grid=True, n_threads=1, use_gradient=True):
         r = guess
+        if use_gradient:
+            jac = lambda x: numpy.asarray([-i for i in self.model.gradient(*x)])
+        else:
+            jac = None
+
         with running_time('BFGS'):
             res = minimize(
                 self.likelihood_f, r,
                 bounds=self.model.bounds,
+                jac=jac,
+                options={'disp': True,}
             )
             r = res.x
+            verbose_print('{}'.format(res))
 
         if use_grid:
             verbose_print('Starting grid search with guess: {}'.format(r))
@@ -619,9 +651,8 @@ def main(args):
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
 
-    models = [RepeatsModel]
     if args.repeats:
-        model_class = models[args.model]
+        model_class = RepeatsModel
     else:
         model_class = BasicModel
     model = model_class(
@@ -639,7 +670,10 @@ def main(args):
     else:
         verbose_print('Estimating coverage for {}'.format(args.input_histogram))
         if args.start_original:
-            cov, e, q1, q2, q = orig
+            if (args.repeats):
+                cov, e, q1, q2, q = orig
+            else:
+                cov, e = orig
         else:
             # compute guess
             cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
@@ -665,7 +699,7 @@ def main(args):
         fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
         estimator = CoverageEstimator(model, fix)
         res = estimator.compute_coverage(
-            guess, use_grid=args.grid, n_threads=args.thread_count
+            guess, use_grid=args.grid, n_threads=args.thread_count, use_gradient=args.derivative
         )
         reads_size = None
         if args.genome_size is not None:
@@ -700,6 +734,8 @@ if __name__ == '__main__':
                         help='Trim histogram automatically with this treshold')
     parser.add_argument('-g', '--grid', action='store_true', default=False,
                         help='Use grid search')
+    parser.add_argument('-d', '--derivative', action='store_true', default=False,
+                        help='Use gradient in LBFGSB')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('-q1', type=float, help='q1')
@@ -709,8 +745,6 @@ if __name__ == '__main__':
                         help='Start form given values')
     parser.add_argument('-f', '--fix', action='store_true',
                         help='Fix some vars, optimize others')
-    parser.add_argument('-m', '--model', default=DEFAULT_REPEAT_MODEL, type=int,
-                        help='Model to use for estimation')
     parser.add_argument('-T', '--thread-count', default=DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
     parser.add_argument('-s', '--genome-size', help='Calculate genome size from reads')
