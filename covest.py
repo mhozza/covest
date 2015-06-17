@@ -4,7 +4,6 @@ import itertools
 from collections import defaultdict
 from scipy.misc import comb
 from scipy.optimize import minimize
-from scipy.optimize import approx_fprime
 import argparse
 from inverse import inverse
 import matplotlib.pyplot as plt
@@ -16,7 +15,7 @@ from math import exp, log
 from multiprocessing import Pool  # pylint: disable=E0611
 import pickle
 from os import path
-from utils import print_wrap as pw
+# from utils import print_wrap as pw
 
 # defaults
 DEFAULT_K = 21
@@ -270,22 +269,21 @@ class BasicModel:
 
     def der_l(self, var, s, *args):
         c, err = args[:2]
-        # verbose_print('der_l: {} {} {} {}'.format(var, s, args, self.der_correct_c(0, *args)))
         if var == 0:
             nzs = err ** s * (3 ** -s) if err > 0 else 0
             res = self.der_correct_c(
                 var, *args
             ) * (1.0 - err) ** (self.k - s) * nzs
-            # verbose_print('{} {} {}'.format(res, nzs, (1.0 - err) ** (self.k - s)))
         elif var == 1:
             if s > 0:
-                res = - self.correct_c(c) * (3 ** - s) * err ** (s - 1) * (1 - err) ** (self.k - s - 1) * (self.k * err - s)
+                res = (
+                    - self.correct_c(c) * (3 ** - s) * err ** (s - 1)
+                    * (1 - err) ** (self.k - s - 1) * (self.k * err - s)
+                )
             else:
                 res = - self.correct_c(c) * self.k * (1 - err) ** (self.k - 1)
-            # verbose_print('{} {} {} {}'.format(res, nzs, err ** s * (s - self.k) * (1.0 - err) ** (self.k - s - 1), self.correct_c(c) * (3 ** -s) ))
         else:
             res = 0
-
         return res
 
     def der_tr_poisson(self, var, s, l_s, j, *args):
@@ -298,10 +296,11 @@ class BasicModel:
                     p3 = exp(l_s[s]) - 1.0
                 else:
                     p3 = l_s[s]
-                p1 = j * self.der_l(var, s, *args) * p3 * pow(l_s[s], j - 1) - pow(l_s[s], j) * exp(l_s[s]) * self.der_l(var, s, *args)
-                # verbose_print('der_trp {} {} {}'.format(p1, p2, p3))
+                p1 = (
+                    j * self.der_l(var, s, *args) * p3 * pow(l_s[s], j - 1)
+                    - pow(l_s[s], j) * exp(l_s[s]) * self.der_l(var, s, *args)
+                )
                 res = p1 / (p2 * p3 * p3)
-                # verbose_print('ok')
                 return float(res)
             except (OverflowError, FloatingPointError) as e:
                 verbose_print(
@@ -325,7 +324,6 @@ class BasicModel:
         return res
 
     def der_p(self, var, j, *args):
-        # verbose_print('Cpmuting der_p: {} {} {}'.format(var, j, args))
         c, err = args[:2]
         # read to kmer coverage
         ck = self.correct_c(c)
@@ -345,11 +343,9 @@ class BasicModel:
             )
             for s in range(self.max_error)
         )
-        # verbose_print('{}'.format(res))
         return res
 
     def der_likelihood(self, var, *args):
-        # verbose_print('Computing der_ll: {} {}'.format(var, args))
         p_j = self.compute_probabilities(*args)
 
         def col(j):
@@ -357,7 +353,6 @@ class BasicModel:
             return res
 
         res = sum(
-            # pw(pw(self.hist[j], 'hist') * pw(self.der_p(var, j, *args), 'top') / pw(p_j[j], 'bottom'), 'res') if j == 1 else
             col(j)
             for j in range(1, len(self.hist))
             if self.hist[j]
@@ -365,12 +360,7 @@ class BasicModel:
         return res
 
     def gradient(self, *args):
-        verbose_print('Computing gradient, {}'.format(args))
         res = [self.der_likelihood(var, *args) for var in range(len(args))]
-        # f = lambda x: self.compute_loglikelihood(*x)
-        # res2 = approx_fprime(args, f, 1e-8)
-        verbose_print('{}'.format(res))
-
         return res
 
     def plot_probs(self, est, guess, orig):
@@ -442,7 +432,10 @@ class RepeatsModel(BasicModel):
     def compute_probabilities(self, c, err, q1, q2, q):  # pylint: disable=W0221
         b_o = self.get_b_o(q1, q2, q)
         treshold_o = self.get_hist_treshold(b_o, self.treshold)
-        p_o_j = [None] + [super(RepeatsModel, self).compute_probabilities(c * o, err) for o in range(1, treshold_o)]
+        p_o_j = [None] + [
+            super(RepeatsModel, self).compute_probabilities(c * o, err)
+            for o in range(1, treshold_o)
+        ]
         p_j = [None] + [
             sum(
                 b_o(o) * p_o_j[o][j]
@@ -464,7 +457,11 @@ class RepeatsModel(BasicModel):
                 return -q2 if var == 2 else (1 - q1) if var == 3 else 0
             else:
                 if var == 4:
-                    return (1 - q1) * (1 - q2) * ((1 - q) ** (o - 3) - q * (o - 3) * (1 - q) ** (o - 4))
+                    return (
+                        (1 - q1) * (1 - q2) * (
+                            (1 - q) ** (o - 3) - q * (o - 3) * (1 - q) ** (o - 4)
+                        )
+                    )
                 else:
                     t = q2 if var == 2 else q1
                     return -(1 - t) * q * (1 - q) ** (o - 3)
@@ -486,7 +483,10 @@ class RepeatsModel(BasicModel):
             )
         else:
             der_b_o = self.der_b_o(var, *args)
-            p_o_j = [None] + [super(RepeatsModel, self).compute_probabilities(c * o, err) for o in range(1, treshold_o)]
+            p_o_j = [None] + [
+                super(RepeatsModel, self).compute_probabilities(c * o, err)
+                for o in range(1, treshold_o)
+            ]
             res = sum(
                 der_b_o(o) * p_o_j[o][j]
                 for o in range(1, treshold_o)
@@ -494,13 +494,7 @@ class RepeatsModel(BasicModel):
         return res
 
     def gradient(self, *args):
-        verbose_print('Computing gradient, {}'.format(args))
         res = [self.der_likelihood(var, *args) for var in range(len(args))]
-        f = lambda x: self.compute_loglikelihood(*x)
-        res2 = approx_fprime(args, f, 1e-8)
-
-        # verbose_print('{}'.format(res))
-        verbose_print('{} : {}'.format(res, res2))
         return res
 
 
@@ -514,22 +508,18 @@ class CoverageEstimator:
             x = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(x)]
         return -self.model.compute_loglikelihood(*x)
 
-    def compute_coverage(self, guess, use_grid=True, n_threads=1, use_gradient=True):
+    def compute_coverage(self, guess, use_grid=True, n_threads=1):
         r = guess
-        if use_gradient:
-            jac = lambda x: numpy.asarray([-i for i in self.model.gradient(*x)])
-        else:
-            jac = None
+        jac = lambda x: numpy.asarray([-i for i in self.model.gradient(*x)])
 
         with running_time('BFGS'):
             res = minimize(
                 self.likelihood_f, r,
                 bounds=self.model.bounds,
                 jac=jac,
-                options={'disp': True,}
+                options={'disp': True}
             )
             r = res.x
-            verbose_print('{}'.format(res))
 
         if use_grid:
             verbose_print('Starting grid search with guess: {}'.format(r))
@@ -730,7 +720,7 @@ def main(args):
         fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
         estimator = CoverageEstimator(model, fix)
         res = estimator.compute_coverage(
-            guess, use_grid=args.grid, n_threads=args.thread_count, use_gradient=args.derivative
+            guess, use_grid=args.grid, n_threads=args.thread_count
         )
         reads_size = None
         if args.genome_size is not None:
@@ -765,8 +755,6 @@ if __name__ == '__main__':
                         help='Trim histogram automatically with this treshold')
     parser.add_argument('-g', '--grid', action='store_true', default=False,
                         help='Use grid search')
-    parser.add_argument('-d', '--derivative', action='store_true', default=False,
-                        help='Use gradient in LBFGSB')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('-q1', type=float, help='q1')
