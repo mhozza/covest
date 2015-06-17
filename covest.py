@@ -207,7 +207,10 @@ class BasicModel:
                 p1 = 1.0
                 for i in range(1, j + 1):
                     p1 *= l / i
-                if l > 1e-8:
+                while l > 500 and p1 > 0:
+                    p1 /= exp(500)
+                    l -= 500
+                if l > 1e-8 and p1 > 0:
                     p3 = exp(l) - 1.0
                 else:
                     p3 = l
@@ -290,12 +293,19 @@ class BasicModel:
                 l = l_s[s]
                 for i in range(1, j):
                     p1 *= l / (i + 1)
+
+                while l > 500 and p1 > 0:
+                    p1 /= exp(500)
+                    l -= 500
                 if l > 1e-8:
                     p3 = exp(l) - 1.0
                 else:
                     p3 = l
-                p2 = j * p3 - l * exp(l)
-                res = (p1 / p3) * (p2 / p3)
+                if l_s[s] <= 500:
+                    p2 = j - l * exp(l) / p3
+                else:
+                    p2 = j - l_s[s]
+                res = (p1 / p3) * p2
                 return res
             except (OverflowError, FloatingPointError) as e:
                 verbose_print(
