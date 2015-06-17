@@ -182,7 +182,7 @@ class BasicModel:
     def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
-    def tr_poisson(self, l, j):
+    def tr_poisson_old(self, l, j):
         with numpy.errstate(over='raise'):  # pylint: disable=E1101
             try:
                 # if exp(l) == 1.0:  # precision fix
@@ -201,26 +201,16 @@ class BasicModel:
                 )
                 return 0.0
 
-    # def tr_poisson_bad(self, l, j):
-    #     # p_{l, j} = (l^j/j!)/(e^l - 1) = (p1 / p2) / p3
-    #     # log(p_{l, j}) = log((l^j/j!)/(e^l - 1)) = log((p1 / p2) / p3)
-    #     #               = log(p1) - log(p2) - log(p3)
-    #     try:
-    #         # compute p1 and p2 in log scale
-    #         p1 = j * log(l)
-    #         p2 = self.sum_log[j]
-    #         # approxiate p3 if l is too low
-    #         if exp(l) < 1.0:
-    #             p3 = log(exp(l) - 1.0)
-    #         else:
-    #             p3 = log(l)
-    #         # compute final result
-    #         print(l, j, p1, p2, p3)
-    #         return exp(p1 - p2 - p3)
-    #     except (OverflowError, ValueError) as e:
-    #         verbose_print('Error at l: {}, j: {}\n{}'.format(l, j, e))
-    #         raise e
-    #         return 0.0
+    def tr_poisson(self, l, j):
+        p1 = 1.0
+        for i in range(1, j + 1):
+            p1 *= l / i
+        if l > 1e-8:
+            p3 = exp(l) - 1.0
+        else:
+            p3 = l
+        res = p1 / p3
+        return res
 
     @lru_cache(maxsize=None)
     def get_lambda_s(self, c, err):
@@ -287,6 +277,19 @@ class BasicModel:
         return res
 
     def der_tr_poisson(self, var, s, l_s, j, *args):
+        p1 = self.der_l(var, s, *args)
+        l = l_s[s]
+        for i in range(1, j):
+            p1 *= l / (i + 1)
+        if l > 1e-8:
+            p3 = exp(l) - 1.0
+        else:
+            p3 = l
+        p2 = j * p3 - l * exp(l)
+        res = (p1 / p3) * (p2 / p3)
+        return res
+
+    def der_tr_poisson_old(self, var, s, l_s, j, *args):
         with numpy.errstate(over='raise', divide='raise'):  # pylint: disable=E1101
             try:
                 # if exp(l_s[s]) == 1.0:  # precision fix
