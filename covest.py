@@ -202,15 +202,22 @@ class BasicModel:
                 return 0.0
 
     def tr_poisson(self, l, j):
-        p1 = 1.0
-        for i in range(1, j + 1):
-            p1 *= l / i
-        if l > 1e-8:
-            p3 = exp(l) - 1.0
-        else:
-            p3 = l
-        res = p1 / p3
-        return res
+        with numpy.errstate(over='raise'):  # pylint: disable=E1101
+            try:
+                p1 = 1.0
+                for i in range(1, j + 1):
+                    p1 *= l / i
+                if l > 1e-8:
+                    p3 = exp(l) - 1.0
+                else:
+                    p3 = l
+                res = p1 / p3
+                return res
+            except (OverflowError, FloatingPointError) as e:
+                verbose_print(
+                    'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(l, j, e)
+                )
+                return 0.0
 
     @lru_cache(maxsize=None)
     def get_lambda_s(self, c, err):
@@ -277,17 +284,26 @@ class BasicModel:
         return res
 
     def der_tr_poisson(self, var, s, l_s, j, *args):
-        p1 = self.der_l(var, s, *args)
-        l = l_s[s]
-        for i in range(1, j):
-            p1 *= l / (i + 1)
-        if l > 1e-8:
-            p3 = exp(l) - 1.0
-        else:
-            p3 = l
-        p2 = j * p3 - l * exp(l)
-        res = (p1 / p3) * (p2 / p3)
-        return res
+        with numpy.errstate(over='raise', divide='raise'):  # pylint: disable=E1101
+            try:
+                p1 = self.der_l(var, s, *args)
+                l = l_s[s]
+                for i in range(1, j):
+                    p1 *= l / (i + 1)
+                if l > 1e-8:
+                    p3 = exp(l) - 1.0
+                else:
+                    p3 = l
+                p2 = j * p3 - l * exp(l)
+                res = (p1 / p3) * (p2 / p3)
+                return res
+            except (OverflowError, FloatingPointError) as e:
+                verbose_print(
+                    'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
+                        l_s[s], j, e
+                    )
+                )
+                return 0.0
 
     def der_tr_poisson_old(self, var, s, l_s, j, *args):
         with numpy.errstate(over='raise', divide='raise'):  # pylint: disable=E1101
