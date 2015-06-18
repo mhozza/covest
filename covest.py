@@ -28,6 +28,7 @@ VERBOSE = True
 # INF = 1e100
 INF = float('inf')
 USE_BIGFLOAT = False
+MAX_EXP = 300
 
 
 def verbose_print(message):
@@ -207,9 +208,9 @@ class BasicModel:
                 p1 = 1.0
                 for i in range(1, j + 1):
                     p1 *= l / i
-                while l > 500 and p1 > 0:
-                    p1 /= exp(500)
-                    l -= 500
+                while l > MAX_EXP and p1 > 0:
+                    p1 /= exp(MAX_EXP)
+                    l -= MAX_EXP
                 if l > 1e-8 and p1 > 0:
                     p3 = exp(l) - 1.0
                 else:
@@ -290,27 +291,32 @@ class BasicModel:
         with numpy.errstate(over='raise', divide='raise'):  # pylint: disable=E1101
             try:
                 p1 = self.der_l(var, s, *args)
+                # verbose_print('p1_0: {}'.format(p1))
                 l = l_s[s]
                 for i in range(1, j):
                     p1 *= l / (i + 1)
-
-                while l > 500 and p1 > 0:
-                    p1 /= exp(500)
-                    l -= 500
-                if l > 1e-8:
+                # verbose_print('p1_1: {}'.format(p1))
+                while l > MAX_EXP and p1 > 0:
+                    p1 /= exp(MAX_EXP)
+                    l -= MAX_EXP
+                # verbose_print('p1_2: {}'.format(p1))
+                if l > 1e-8 and p1 > 0:
                     p3 = exp(l) - 1.0
                 else:
                     p3 = l
-                if l_s[s] <= 500:
+                # verbose_print('p3: {}'.format(p3))
+                if l_s[s] <= MAX_EXP:
                     p2 = j - l * exp(l) / p3
                 else:
                     p2 = j - l_s[s]
+                # verbose_print('p2: {}'.format(p2))
                 res = (p1 / p3) * p2
+                # verbose_print('res: {}'.format(res))
                 return res
             except (OverflowError, FloatingPointError) as e:
                 verbose_print(
-                    'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
-                        l_s[s], j, e
+                    'Exception at l_orig:{}, l:{}, j:{}\n Consider histogram trimming\n{} L:312'.format(
+                        l_s[s], l, j, e
                     )
                 )
                 return 0.0
@@ -352,7 +358,7 @@ class BasicModel:
         ) / (sum_n_s * sum_n_s)
         return res
 
-    def der_p(self, var, j, *args):
+    def der_p(self, var, *args):
         c, err = args[:2]
         # read to kmer coverage
         ck = self.correct_c(c)
@@ -364,21 +370,28 @@ class BasicModel:
         # portion of kmers with s errors
         a_s = [n_s[s] / sum_n_s for s in range(self.max_error)]
         # probability that unique kmer has coverage j (j > 0)
-        res = sum(
-            self.der_a(
-                var, s, n_s, sum_n_s, l_s, *args
-            ) * self.tr_poisson(l_s[s], j) + a_s[s] * self.der_tr_poisson(
-                var, s, l_s, j, *args
+        res = [None] + [
+            sum(
+                self.der_a(
+                    var, s, n_s, sum_n_s, l_s, *args
+                ) * self.tr_poisson(l_s[s], j) + a_s[s] * self.der_tr_poisson(
+                    var, s, l_s, j, *args
+                )
+                for s in range(self.max_error)
             )
-            for s in range(self.max_error)
-        )
+            for j in range(1, len(self.hist))
+        ]
         return res
 
     def der_likelihood(self, var, *args):
         p_j = self.compute_probabilities(*args)
+        der_p_j = self.der_p(var, *args)
 
         def col(j):
-            res = self.hist[j] * self.der_p(var, j, *args) / p_j[j]
+            # verbose_print('{} {} {}'.format(self.hist[j], der_p_j[j], p_j[j]))
+            if p_j[j] == 0:
+                return INF
+            res = self.hist[j] * der_p_j[j] / p_j[j]
             return res
 
         res = sum(
@@ -432,7 +445,7 @@ class RepeatsModel(BasicModel):
     def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
         super(RepeatsModel, self).__init__(k, r, hist, max_error)
         self.repeats = False
-        self.bounds = ((0.01, max_cov), (0.0, 0.99), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
+        self.bounds = ((0.01, max_cov), (0.0, 0.5), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
         self.treshold = treshold
 
     def get_hist_treshold(self, b_o, treshold):
@@ -496,34 +509,44 @@ class RepeatsModel(BasicModel):
                     return -(1 - t) * q * (1 - q) ** (o - 3)
         return b_o
 
-    def der_p_o_j(self, var, o, j, *args):
+    def der_p_o(self, var, o, *args):
         args = list(args)
         args[0] = o * args[0]
-        return super(RepeatsModel, self).der_p(var, j, *args)
+        return super(RepeatsModel, self).der_p(var, *args)
 
-    def der_p(self, var, j, *args):
+    def der_p(self, var, *args):
         c, err, q1, q2, q = args[:5]
         b_o = self.get_b_o(q1, q2, q)
         treshold_o = self.get_hist_treshold(b_o, self.treshold)
         if var < 2:
-            res = sum(
-                b_o(o) * self.der_p_o_j(var, o, j, *args)
-                for o in range(1, treshold_o)
-            )
+            der_p_o_j = [None] + [self.der_p_o(var, o, *args) for o in range(1, treshold_o)]
+            res = [None] + [
+                sum(
+                    b_o(o) * der_p_o_j[o][j]
+                    for o in range(1, treshold_o)
+                )
+                for j in range(1, len(self.hist))
+            ]
         else:
             der_b_o = self.der_b_o(var, *args)
             p_o_j = [None] + [
                 super(RepeatsModel, self).compute_probabilities(c * o, err)
                 for o in range(1, treshold_o)
             ]
-            res = sum(
-                der_b_o(o) * p_o_j[o][j]
-                for o in range(1, treshold_o)
-            )
+            res = [None] + [
+                sum(
+                    der_b_o(o) * p_o_j[o][j]
+                    for o in range(1, treshold_o)
+                )
+                for j in range(1, len(self.hist))
+            ]
         return res
 
+    @running_time_decorator
     def gradient(self, *args):
+        verbose_print('Gradient for {}'.format(args))
         res = [self.der_likelihood(var, *args) for var in range(len(args))]
+        verbose_print('{}'.format(res))
         return res
 
 
@@ -541,6 +564,7 @@ class CoverageEstimator:
         r = guess
         jac = lambda x: numpy.asarray([-i for i in self.model.gradient(*x)])
 
+        verbose_print('Bounds: {}'.format(self.model.bounds))
         with running_time('BFGS'):
             res = minimize(
                 self.likelihood_f, r,
@@ -665,7 +689,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     min_val = sgn * unpack_call([f, initial_guess])
     min_args = initial_guess
     step = 1.1
-    grid_depth = 3
+    grid_depth = 1
     diff = 1
     n_iter = 0
     try:
