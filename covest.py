@@ -203,6 +203,8 @@ class BasicModel:
                 return 0.0
 
     def tr_poisson(self, l, j):
+        if l == 0:
+            return 0.0
         with numpy.errstate(over='raise'):  # pylint: disable=E1101
             try:
                 p1 = 1.0
