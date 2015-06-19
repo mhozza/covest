@@ -295,6 +295,8 @@ class BasicModel:
                 p1 = self.der_l(var, s, *args)
                 # verbose_print('p1_0: {}'.format(p1))
                 l = l_s[s]
+                if l == 0:
+                    return 0
                 for i in range(1, j):
                     p1 *= l / (i + 1)
                 # verbose_print('p1_1: {}'.format(p1))
