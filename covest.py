@@ -29,6 +29,7 @@ VERBOSE = True
 INF = float('inf')
 USE_BIGFLOAT = False
 MAX_EXP = 300
+USE_DERIVATIVES=True
 
 
 def verbose_print(message):
@@ -566,7 +567,10 @@ class CoverageEstimator:
 
     def compute_coverage(self, guess, use_grid=True, n_threads=1):
         r = guess
-        jac = lambda x: numpy.asarray([-i for i in self.model.gradient(*x)])
+
+        jac = False
+        if USE_DERIVATIVES:
+            jac = lambda x: numpy.asarray([-i for i in self.model.gradient(*x)])
 
         verbose_print('Bounds: {}'.format(self.model.bounds))
         with running_time('BFGS'):
