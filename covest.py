@@ -29,7 +29,8 @@ VERBOSE = True
 INF = float('inf')
 USE_BIGFLOAT = False
 MAX_EXP = 300
-USE_DERIVATIVES=True
+USE_DERIVATIVES = True
+GRID_DEPTH=3
 
 
 def verbose_print(message):
@@ -476,7 +477,7 @@ class RepeatsModel(BasicModel):
                 return o_n * (1 - q) ** (o - 3)
         return b_o
 
-    def compute_probabilities(self, c, err, q1, q2, q):  # pylint: disable=W0221
+    def compute_probabilities_new(self, c, err, q1, q2, q):  # pylint: disable=W0221
         b_o = self.get_b_o(q1, q2, q)
         treshold_o = self.get_hist_treshold(b_o, self.treshold)
         p_o_j = [None] + [
@@ -486,6 +487,44 @@ class RepeatsModel(BasicModel):
         p_j = [None] + [
             sum(
                 b_o(o) * p_o_j[o][j]
+                for o in range(1, treshold_o)
+            )
+            for j in range(1, len(self.hist))
+        ]
+        p_j_old = self.compute_probabilities_old(c, err, q1, q1, q)
+        print(p_j_old)
+        print(p_j)
+        # assert(p_j_old == p_j)
+        return p_j
+
+    def compute_probabilities(self, c, err, q1, q2, q):  # pylint: disable=W0221
+        b_o = self.get_b_o(q1, q2, q)
+        treshold_o = self.get_hist_treshold(b_o, self.treshold)
+        # read to kmer coverage
+        c = self.correct_c(c)
+        # lambda for kmers with s errors
+        l_s = self.get_lambda_s(c, err)
+        # expected probability of kmers with s errors and coverage >= 1
+        n_os = [None] + [
+            [self.comb[s] * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(self.max_error)]
+            for o in range(1, treshold_o)
+        ]
+        sum_n_os = [None] + [
+            fix_zero(sum(n_os[o][t] for t in range(self.max_error))) for o in range(1, treshold_o)
+        ]
+
+        # portion of kmers wit1h s errors
+        a_os = [None] + [
+            [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(self.max_error)]
+            for o in range(1, treshold_o)
+        ]
+        # probability that unique kmer has coverage j (j > 0)
+        p_j = [None] + [
+            sum(
+                b_o(o) * sum(
+                    a_os[o][s] * self.tr_poisson(o * l_s[s], j)
+                    for s in range(self.max_error)
+                )
                 for o in range(1, treshold_o)
             )
             for j in range(1, len(self.hist))
@@ -568,7 +607,7 @@ class CoverageEstimator:
     def compute_coverage(self, guess, use_grid=True, n_threads=1):
         r = guess
 
-        jac = False
+        jac = None
         if USE_DERIVATIVES:
             jac = lambda x: numpy.asarray([-i for i in self.model.gradient(*x)])
 
@@ -697,7 +736,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     min_val = sgn * unpack_call([f, initial_guess])
     min_args = initial_guess
     step = 1.1
-    grid_depth = 1
+    grid_depth = GRID_DEPTH
     diff = 1
     n_iter = 0
     try:
