@@ -1,0 +1,6 @@
+MAX_EXP = 300
+USE_DERIVATIVES = True
+GRID_DEPTH = 3
+INF = float('inf')
+VERBOSE = True
+USE_BIGFLOAT = False
