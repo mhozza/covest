@@ -8,7 +8,7 @@ from perf import running_time_decorator, running_time
 from functools import lru_cache
 import json
 import numpy
-from math import exp, log
+from math import exp
 from multiprocessing import Pool  # pylint: disable=E0611
 import pickle
 from os import path

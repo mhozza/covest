@@ -3,16 +3,15 @@ import matplotlib.pyplot as plt
 from perf import running_time_decorator
 from functools import lru_cache
 import numpy
-from math import exp, log
 from utils import verbose_print
 import config
-
 
 try:
     if not config.USE_BIGFLOAT:
         raise ImportError("USE_BIGFLOAT is false")
     from bigfloat import BigFloat, exp, log
 except ImportError:
+    from math import exp, log
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
 
 
@@ -157,8 +156,8 @@ class BasicModel:
         elif var == 1:
             if s > 0:
                 res = (
-                    - self.correct_c(c) * (3 ** - s) * err ** (s - 1)
-                    * (1 - err) ** (self.k - s - 1) * (self.k * err - s)
+                    - self.correct_c(c) * (3 ** - s) * err ** (s - 1) *
+                    (1 - err) ** (self.k - s - 1) * (self.k * err - s)
                 )
             else:
                 res = - self.correct_c(c) * self.k * (1 - err) ** (self.k - 1)
@@ -196,7 +195,8 @@ class BasicModel:
                 return res
             except (OverflowError, FloatingPointError) as e:
                 verbose_print(
-                    'Exception at l_orig:{}, l:{}, j:{}\n Consider histogram trimming\n{} L:312'.format(
+                    'Exception at l_orig:{}, l:{}, j:{}\n'
+                    'Consider histogram trimming\n{} L:312'.format(
                         l_s[s], l, j, e
                     )
                 )
@@ -213,8 +213,8 @@ class BasicModel:
                 else:
                     p3 = l_s[s]
                 p1 = (
-                    j * self.der_l(var, s, *args) * p3 * pow(l_s[s], j - 1)
-                    - pow(l_s[s], j) * exp(l_s[s]) * self.der_l(var, s, *args)
+                    j * self.der_l(var, s, *args) * p3 * pow(l_s[s], j - 1) -
+                    pow(l_s[s], j) * exp(l_s[s]) * self.der_l(var, s, *args)
                 )
                 res = p1 / (p2 * p3 * p3)
                 return float(res)
