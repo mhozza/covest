@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-import itertools
-from collections import defaultdict
-from scipy.optimize import minimize
 import argparse
-from inverse import inverse
-from perf import running_time_decorator, running_time
-from functools import lru_cache
+import itertools
 import json
-import numpy
-from math import exp
-from multiprocessing import Pool  # pylint: disable=E0611
 import pickle
+from collections import defaultdict
+from functools import lru_cache
+from math import exp
+from multiprocessing import Pool
 from os import path
-from models import BasicModel, RepeatsModel
-from utils import verbose_print
+
+import numpy
+from scipy.optimize import minimize
+
 import config
+from inverse import inverse
+from models import BasicModel, RepeatsModel
+from perf import running_time, running_time_decorator
+from utils import verbose_print
+
 # from utils import print_wrap as pw
 
 # defaults
@@ -139,6 +142,7 @@ class CoverageEstimator:
         with running_time('BFGS'):
             res = minimize(
                 self.likelihood_f, r,
+                method='TNC',
                 bounds=self.model.bounds,
                 jac=jac,
                 options={'disp': True}

@@ -326,7 +326,7 @@ class RepeatsModel(BasicModel):
     def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
         super(RepeatsModel, self).__init__(k, r, hist, max_error)
         self.repeats = False
-        self.bounds = ((0.01, max_cov), (0.0, 0.5), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
+        self.bounds = ((0.01, max_cov), (0.0, 0.5), (0.0, 0.99), (0.0, 0.99), (0.0, 0.99))
         self.treshold = treshold
 
     def get_hist_treshold(self, b_o, treshold):
