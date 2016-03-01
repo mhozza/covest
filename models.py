@@ -290,14 +290,18 @@ class BasicModel:
         def fmt(p):
             return ['{:.3f}'.format(x) for x in p[:20]]
 
+        def adjust_probs(probs):
+            return [0 if p is None else i * p for i, p in enumerate(probs)]
+
         hs = float(sum(self.hist))
-        hp = [f / hs for f in self.hist]
-        ep = self.compute_probabilities(*est)
-        gp = self.compute_probabilities(*guess)
+        hp = adjust_probs([f / hs for f in self.hist])
+        ep = adjust_probs(self.compute_probabilities(*est))
+        gp = adjust_probs(self.compute_probabilities(*guess))
         if orig is not None:
-            op = self.compute_probabilities(*orig)
+            op = adjust_probs(self.compute_probabilities(*orig))
         else:
-            op = [0 for j in range(len(self.hist))]
+            op = adjust_probs([0 for j in range(len(self.hist))])
+        plt.yscale('log')
         plt.plot(
             range(len(hp)), hp, 'ko',
             label='hist',
