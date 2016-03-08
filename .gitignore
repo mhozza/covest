@@ -9,3 +9,4 @@ bamUtil/
 *.pyc
 *.kh
 *.kh.info
+.venv

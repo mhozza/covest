@@ -9,7 +9,6 @@ from math import exp
 from multiprocessing import Pool
 from os import path
 
-import numpy
 from scipy.optimize import minimize
 
 import config
@@ -17,8 +16,6 @@ from inverse import inverse
 from models import BasicModel, RepeatsModel
 from perf import running_time, running_time_decorator
 from utils import verbose_print
-
-# from utils import print_wrap as pw
 
 # defaults
 DEFAULT_K = 21
@@ -134,17 +131,12 @@ class CoverageEstimator:
     def compute_coverage(self, guess, use_grid=True, n_threads=1):
         r = guess
 
-        jac = None
-        if config.USE_DERIVATIVES:
-            jac = lambda x: numpy.asarray([-i for i in self.model.gradient(*x)])
-
         verbose_print('Bounds: {}'.format(self.model.bounds))
-        with running_time('BFGS'):
+        with running_time('First optimalization'):
             res = minimize(
                 self.likelihood_f, r,
                 method='TNC',
                 bounds=self.model.bounds,
-                jac=jac,
                 options={'disp': True}
             )
             r = res.x
