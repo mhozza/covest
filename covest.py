@@ -291,7 +291,7 @@ def main(args):
     hist_orig, hist = load_hist(
         args.input_histogram, autotrim=args.autotrim, trim=args.trim
     )
-
+    # Model selection
     if args.repeats:
         model_class = RepeatsModel
     else:
@@ -316,11 +316,11 @@ def main(args):
             else:
                 cov, e = orig
         else:
-            # compute guess
+            # Compute initial guess
             cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
-            # We were unable to guess cov and e.
-            # Try to estimate from some fixed valid data instead.
             if cov == 0 and e == 1:
+                # We were unable to guess cov and e.
+                # Try to estimate from some fixed valid data instead.
                 cov, e = 1, 0.5
             if args.fix:
                 if args.coverage is not None:
@@ -328,6 +328,8 @@ def main(args):
                 if args.error_rate is not None:
                     e = args.error_rate
             q1, q2, q = [0.5 if i is None else i for i in [args.q1, args.q2, args.q]]
+
+        # Initial guess
         if args.repeats:
             guess = [cov, e, q1, q2, q]
         else:
