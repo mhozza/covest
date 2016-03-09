@@ -119,7 +119,7 @@ class BasicModel:
 
     def plot_probs(self, est, guess, orig):
         def fmt(p):
-            return ['{:.3f}'.format(x) for x in p[:20]]
+            return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20] ]
 
         def adjust_probs(probs):
             return [0 if p is None else i * p for i, p in enumerate(probs)]
@@ -128,10 +128,11 @@ class BasicModel:
         hp = adjust_probs([f / hs for f in self.hist])
         ep = adjust_probs(self.compute_probabilities(*est))
         gp = adjust_probs(self.compute_probabilities(*guess))
-        if orig is not None:
+        if orig is not None and None not in orig:
             op = adjust_probs(self.compute_probabilities(*orig))
         else:
             op = adjust_probs([0 for j in range(len(self.hist))])
+
         plt.yscale('log')
         plt.plot(
             range(len(hp)), hp, 'ko',
@@ -161,7 +162,7 @@ class RepeatsModel(BasicModel):
     def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
         super(RepeatsModel, self).__init__(k, r, hist, max_error)
         self.repeats = False
-        self.bounds = ((0.01, max_cov), (0.0, 0.5), (0.0, 0.99), (0.0, 0.99), (0.0, 0.99))
+        self.bounds = ((0.01, max_cov), (0.0, 0.5), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
         self.treshold = treshold
 
     def get_hist_treshold(self, b_o, treshold):
