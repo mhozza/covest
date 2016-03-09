@@ -7,7 +7,7 @@ import random
 from collections import defaultdict
 from functools import lru_cache
 from math import exp
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 from os import path
 
 from scipy.optimize import minimize
@@ -21,8 +21,11 @@ from utils import verbose_print
 # defaults
 DEFAULT_K = 21
 DEFAULT_READ_LENGTH = 100
-DEFAULT_THREAD_COUNT = 4
 DEFAULT_REPEAT_MODEL = 0
+try:
+    DEFAULT_THREAD_COUNT = cpu_count()
+except NotImplementedError:
+    DEFAULT_THREAD_COUNT = 2
 
 
 def estimate_p(cc, alpha):
@@ -133,32 +136,36 @@ class CoverageEstimator:
             x = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(x)]
         return -self.model.compute_loglikelihood(*x)
 
-    def compute_coverage(self, guess, grid_search_type=GRID_SEARCH_TYPE_PRE, n_threads=1):
+    def _optimize(self, r):
+        return minimize(
+            self.likelihood_f, r,
+            method=config.OPTIMALIZATION_METHOD,
+            bounds=self.model.bounds,
+            options={'disp': False}
+        )
+
+    def compute_coverage(
+        self,
+        guess,
+        grid_search_type=GRID_SEARCH_TYPE_PRE,
+        n_threads=DEFAULT_THREAD_COUNT,
+    ):
         r = guess
         success = True
 
         verbose_print('Bounds: {}'.format(self.model.bounds))
         if grid_search_type == self.GRID_SEARCH_TYPE_NONE:
             with running_time('First optimalization'):
-                res = minimize(
-                    self.likelihood_f, r,
-                    method=config.OPTIMALIZATION_METHOD,
-                    bounds=self.model.bounds,
-                    options={'disp': True}
-                )
+                res = self._optimize(r)
                 r = res.x
                 success = res.success
         else:
             params = initial_grid(r, bounds=self.model.bounds)
             with running_time('Initial grid optimalization'):
                 min_r = None
-                for p in params:
-                    res = minimize(
-                        self.likelihood_f, p,
-                        method=config.OPTIMALIZATION_METHOD,
-                        bounds=self.model.bounds,
-                        options={'disp': True}
-                    )
+                with Pool(n_threads) as pool:
+                    results = list(pool.map(self._optimize, params))
+                for res in results:
                     if min_r is None or min_r > res.fun:
                         min_r = res.fun
                         r = res.x
