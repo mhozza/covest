@@ -316,7 +316,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     return min_args
 
 
-def initial_grid(initial_guess, count=10, bounds=None, fix=None,):
+def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fix=None,):
     def generate_grid(step):
         def apply_bounds(interval, i):
             if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
@@ -348,7 +348,7 @@ def initial_grid(initial_guess, count=10, bounds=None, fix=None,):
 
     if fix is None:
         fix = [None] * len(initial_guess)
-    return list(generate_grid(3))
+    return list(generate_grid(config.INITIAL_GRID_STEP))
 
 
 @running_time_decorator
