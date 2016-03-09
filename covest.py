@@ -119,6 +119,10 @@ def compute_coverage_apx(hist, k, r):
 
 
 class CoverageEstimator:
+    GRID_SEARCH_TYPE_NONE = 0
+    GRID_SEARCH_TYPE_PRE = 1
+    GRID_SEARCH_TYPE_POST = 2
+
     def __init__(self, model, fix=None):
         self.model = model
         self.fix = fix
@@ -128,20 +132,38 @@ class CoverageEstimator:
             x = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(x)]
         return -self.model.compute_loglikelihood(*x)
 
-    def compute_coverage(self, guess, use_grid=True, n_threads=1):
+    def compute_coverage(self, guess, grid_search_type=GRID_SEARCH_TYPE_PRE, n_threads=1):
         r = guess
+        success = True
 
         verbose_print('Bounds: {}'.format(self.model.bounds))
-        with running_time('First optimalization'):
-            res = minimize(
-                self.likelihood_f, r,
-                method='TNC',
-                bounds=self.model.bounds,
-                options={'disp': True}
-            )
-            r = res.x
+        if grid_search_type == self.GRID_SEARCH_TYPE_NONE:
+            with running_time('First optimalization'):
+                res = minimize(
+                    self.likelihood_f, r,
+                    method=config.OPTIMALIZATION_METHOD,
+                    bounds=self.model.bounds,
+                    options={'disp': True}
+                )
+                r = res.x
+                success = res.success
+        else:
+            params = initial_grid(r, bounds=self.model.bounds)
+            with running_time('Initial grid optimalization'):
+                min_r = None
+                for p in params:
+                    res = minimize(
+                        self.likelihood_f, p,
+                        method=config.OPTIMALIZATION_METHOD,
+                        bounds=self.model.bounds,
+                        options={'disp': True}
+                    )
+                    if min_r is None or min_r > res.fun:
+                        min_r = res.fun
+                        r = res.x
+                        success = res.success
 
-        if use_grid:
+        if grid_search_type == self.GRID_SEARCH_TYPE_POST and not success:
             verbose_print('Starting grid search with guess: {}'.format(r))
             r = optimize_grid(
                 self.likelihood_f, r, bounds=self.model.bounds,
@@ -255,7 +277,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     f = pickle.dumps(fn, pickle.HIGHEST_PROTOCOL)
     min_val = sgn * unpack_call([f, initial_guess])
     min_args = initial_guess
-    step = 1.1
+    step = config.STEP
     grid_depth = config.GRID_DEPTH
     diff = 1
     n_iter = 0
@@ -284,6 +306,37 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
 
     verbose_print('Number of iterations in grid search:{}'.format(n_iter))
     return min_args
+
+
+def initial_grid(initial_guess, bounds=None, fix=None):
+    def generate_grid(args, step, max_depth):
+        def generate_grid_single(var, fix=None):
+            if fix is None:
+                return (
+                    var * step ** d
+                    for d in range(-max_depth, max_depth + 1)
+                )
+            else:
+                return [fix]
+
+        def filter_bounds(var_grid, i):
+            if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
+                return var_grid
+            low, high = bounds[i]
+            return (
+                var for var in var_grid
+                if (low is None or var >= low) and (high is None or var <= high)
+            )
+
+        var_grids = [
+            list(filter_bounds(generate_grid_single(var, fix[i]), i))
+            for i, var in enumerate(args)
+        ]
+        return itertools.product(*var_grids)
+
+    if fix is None:
+        fix = [None] * len(initial_guess)
+    return list(generate_grid(initial_guess, config.STEP, config.GRID_DEPTH))
 
 
 @running_time_decorator
@@ -342,7 +395,9 @@ def main(args):
         fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
         estimator = CoverageEstimator(model, fix)
         res = estimator.compute_coverage(
-            guess, use_grid=args.grid, n_threads=args.thread_count
+            guess,
+            grid_search_type=CoverageEstimator.GRID_SEARCH_TYPE_PRE,
+            n_threads=args.thread_count,
         )
         reads_size = None
         if args.genome_size is not None:
