@@ -3,6 +3,7 @@ import argparse
 import itertools
 import json
 import pickle
+import random
 from collections import defaultdict
 from functools import lru_cache
 from math import exp
@@ -308,35 +309,39 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     return min_args
 
 
-def initial_grid(initial_guess, bounds=None, fix=None):
-    def generate_grid(args, step, max_depth):
-        def generate_grid_single(var, fix=None):
-            if fix is None:
-                return (
-                    var * step ** d
-                    for d in range(-max_depth, max_depth + 1)
-                )
-            else:
-                return [fix]
-
-        def filter_bounds(var_grid, i):
+def initial_grid(initial_guess, count=10, bounds=None, fix=None,):
+    def generate_grid(step):
+        def apply_bounds(interval, i):
             if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
-                return var_grid
-            low, high = bounds[i]
-            return (
-                var for var in var_grid
-                if (low is None or var >= low) and (high is None or var <= high)
-            )
+                return interval
+            lb, rb = bounds[i]
+            li, ri = interval
+            if lb is not None:
+                li = max(li, lb)
+            if rb is not None:
+                ri = min(ri, rb)
+            return li, ri
 
-        var_grids = [
-            list(filter_bounds(generate_grid_single(var, fix[i]), i))
-            for i, var in enumerate(args)
-        ]
-        return itertools.product(*var_grids)
+        def generate_random_params():
+            bounds = [
+                apply_bounds((var / step, var * step), i) for i, var in enumerate(initial_guess)
+            ]
+            return [
+                random.uniform(*interval) if fix is None or fix[i] is None else fix[i]
+                for i, interval in enumerate(bounds)
+            ]
+
+        if count < 1:
+            grid = []
+        else:
+            grid = [initial_guess]
+            for _ in range(count - 1):
+                grid.append(generate_random_params())
+        return grid
 
     if fix is None:
         fix = [None] * len(initial_guess)
-    return list(generate_grid(initial_guess, config.STEP, config.GRID_DEPTH))
+    return list(generate_grid(3))
 
 
 @running_time_decorator
