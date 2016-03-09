@@ -52,7 +52,7 @@ class BasicModel:
             self.factorial.append(t)
             self.sum_log.append(self.sum_log[-1] + self.log[i])
 
-    def _correct_c(self, c):
+    def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
     def _tr_poisson(self, l, j):
@@ -87,7 +87,7 @@ class BasicModel:
 
     def compute_probabilities(self, c, err, *_):
         # read to kmer coverage
-        ck = self._correct_c(c)
+        ck = self.correct_c(c)
         # lambda for kmers with s errors
         l_s = self._get_lambda_s(ck, err)
         # expected probability of kmers with s errors and coverage >= 1
@@ -191,7 +191,7 @@ class RepeatsModel(BasicModel):
         b_o = self._get_b_o(q1, q2, q)
         treshold_o = self._get_hist_treshold(b_o, self.treshold)
         # read to kmer coverage
-        c = self._correct_c(c)
+        c = self.correct_c(c)
         # lambda for kmers with s errors
         l_s = self._get_lambda_s(c, err)
         # expected probability of kmers with s errors and coverage >= 1
