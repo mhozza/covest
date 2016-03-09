@@ -52,7 +52,7 @@ class BasicModel:
             self.factorial.append(t)
             self.sum_log.append(self.sum_log[-1] + self.log[i])
 
-    def correct_c(self, c):
+    def _correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
     def _tr_poisson(self, l, j):
@@ -87,7 +87,7 @@ class BasicModel:
 
     def compute_probabilities(self, c, err, *_):
         # read to kmer coverage
-        ck = self.correct_c(c)
+        ck = self._correct_c(c)
         # lambda for kmers with s errors
         l_s = self._get_lambda_s(ck, err)
         # expected probability of kmers with s errors and coverage >= 1
@@ -164,7 +164,7 @@ class RepeatsModel(BasicModel):
         self.bounds = ((0.01, max_cov), (0.0, 0.5), (0.0, 0.99), (0.0, 0.99), (0.0, 0.99))
         self.treshold = treshold
 
-    def _get_hist_treshold(self, b_o, treshold):
+    def get_hist_treshold(self, b_o, treshold):
         hist_size = len(self.hist)
         if treshold is not None:
             for o in range(1, hist_size):
@@ -172,7 +172,7 @@ class RepeatsModel(BasicModel):
                     return o
         return hist_size
 
-    def _get_b_o(self, q1, q2, q):
+    def get_b_o(self, q1, q2, q):
         o_2 = (1 - q1) * q2
         o_n = (1 - q1) * (1 - q2) * q
 
@@ -187,11 +187,11 @@ class RepeatsModel(BasicModel):
                 return o_n * (1 - q) ** (o - 3)
         return b_o
 
-    def compute_probabilities(self, c, err, q1, q2, q):  # pylint: disable=W0221
-        b_o = self._get_b_o(q1, q2, q)
-        treshold_o = self._get_hist_treshold(b_o, self.treshold)
+    def compute_probabilities(self, c, err, q1, q2, q):
+        b_o = self.get_b_o(q1, q2, q)
+        treshold_o = self.get_hist_treshold(b_o, self.treshold)
         # read to kmer coverage
-        c = self.correct_c(c)
+        c = self._correct_c(c)
         # lambda for kmers with s errors
         l_s = self._get_lambda_s(c, err)
         # expected probability of kmers with s errors and coverage >= 1
