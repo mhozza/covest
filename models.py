@@ -33,24 +33,18 @@ class BasicModel:
         self.k = k
         self.r = r
         self.bounds = ((0.01, max_cov), (0.0, 0.5))
-        self.comb = [comb(k, s) for s in range(k + 1)]
+        self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
         self.hist = hist
         if max_error is None:
             self.max_error = self.k + 1
         else:
             self.max_error = min(self.k + 1, max_error)
-        self.log = [config.INF] + [log(j) for j in range(1, len(hist) + 1)]
 
-        self.factorial = [1]
-        self.sum_log = [0]
-        for i in range(1, len(hist)):
-            t = self.factorial[-1] * i
-            if config.USE_BIGFLOAT:
-                t = BigFloat(t)
-            else:
-                t = float(t)
-            self.factorial.append(t)
-            self.sum_log.append(self.sum_log[-1] + self.log[i])
+    def _check_bounds(self, args):
+        for arg, (l, r) in zip(args, self.bounds):
+            if (l is not None and arg < l) or (r is not None and arg > r):
+                return False
+        return True
 
     def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
@@ -91,7 +85,7 @@ class BasicModel:
         # lambda for kmers with s errors
         l_s = self._get_lambda_s(ck, err)
         # expected probability of kmers with s errors and coverage >= 1
-        n_s = [self.comb[s] * (3 ** s) * (1.0 - exp(-l_s[s])) for s in range(self.max_error)]
+        n_s = [self.comb[s] * (1.0 - exp(-l_s[s])) for s in range(self.max_error)]
         sum_n_s = fix_zero(sum(n_s[t] for t in range(self.max_error)))
         # portion of kmers with s errors
         a_s = [n_s[s] / sum_n_s for s in range(self.max_error)]
@@ -107,8 +101,7 @@ class BasicModel:
         return p_j
 
     def compute_loglikelihood(self, *args):
-        c, err = args[:2]
-        if err < 0 or err >= 1 or c <= 0:
+        if not self._check_bounds(args):
             return -config.INF
         p_j = self.compute_probabilities(*args)
         return float(sum(
@@ -155,7 +148,10 @@ class BasicModel:
             ms=4,
         )
         plt.legend()
-        plt.show()
+        try:
+            plt.show()
+        except KeyboardInterrupt:
+            pass
 
 
 class RepeatsModel(BasicModel):
@@ -197,7 +193,7 @@ class RepeatsModel(BasicModel):
         l_s = self._get_lambda_s(c, err)
         # expected probability of kmers with s errors and coverage >= 1
         n_os = [None] + [
-            [self.comb[s] * (3 ** s) * (1.0 - exp(o * -l_s[s])) for s in range(self.max_error)]
+            [self.comb[s] * (1.0 - exp(o * -l_s[s])) for s in range(self.max_error)]
             for o in range(1, treshold_o)
         ]
         sum_n_os = [None] + [
