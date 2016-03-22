@@ -152,32 +152,34 @@ class CoverageEstimator:
     ):
         r = guess
         success = True
+        try:
+            verbose_print('Bounds: {}'.format(self.model.bounds))
+            if grid_search_type == self.GRID_SEARCH_TYPE_NONE:
+                with running_time('First optimalization'):
+                    res = self._optimize(r)
+                    r = res.x
+                    success = res.success
+            else:
+                params = initial_grid(r, bounds=self.model.bounds)
+                with running_time('Initial grid optimalization'):
+                    min_r = None
+                    with Pool(n_threads) as pool:
+                        results = list(pool.map(self._optimize, params))
+                    for res in results:
+                        if min_r is None or min_r > res.fun:
+                            min_r = res.fun
+                            r = res.x
+                            success = res.success
 
-        verbose_print('Bounds: {}'.format(self.model.bounds))
-        if grid_search_type == self.GRID_SEARCH_TYPE_NONE:
-            with running_time('First optimalization'):
-                res = self._optimize(r)
-                r = res.x
-                success = res.success
-        else:
-            params = initial_grid(r, bounds=self.model.bounds)
-            with running_time('Initial grid optimalization'):
-                min_r = None
-                with Pool(n_threads) as pool:
-                    results = list(pool.map(self._optimize, params))
-                for res in results:
-                    if min_r is None or min_r > res.fun:
-                        min_r = res.fun
-                        r = res.x
-                        success = res.success
-
-        if grid_search_type == self.GRID_SEARCH_TYPE_POST and not success:
-            verbose_print('Starting grid search with guess: {}'.format(r))
-            r = optimize_grid(
-                self.likelihood_f, r, bounds=self.model.bounds,
-                fix=self.fix, n_threads=n_threads,
-            )
-        return r
+            if grid_search_type == self.GRID_SEARCH_TYPE_POST and not success:
+                verbose_print('Starting grid search with guess: {}'.format(r))
+                r = optimize_grid(
+                    self.likelihood_f, r, bounds=self.model.bounds,
+                    fix=self.fix, n_threads=n_threads,
+                )
+            return r
+        except KeyboardInterrupt:
+            return r
 
     def print_output(self, estimated=None, guess=None,
                      orig_coverage=None, orig_error_rate=None,

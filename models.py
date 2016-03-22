@@ -119,7 +119,7 @@ class BasicModel:
 
     def plot_probs(self, est, guess, orig):
         def fmt(p):
-            return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20] ]
+            return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20]]
 
         def adjust_probs(probs):
             return [0 if p is None else i * p for i, p in enumerate(probs)]
