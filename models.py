@@ -28,11 +28,12 @@ def safe_log(x):
 
 
 class BasicModel:
-    def __init__(self, k, r, hist, max_error=None, max_cov=None):
+    def __init__(self, k, r, hist, err_scale=1, max_error=None, max_cov=None):
         self.repeats = False
         self.k = k
         self.r = r
-        self.bounds = ((0.01, max_cov), (0.0, 0.5))
+        self.err_scale = err_scale
+        self.bounds = ((0.01, max_cov), (0.0, 0.5 * self.err_scale))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
         self.hist = hist
         if max_error is None:
@@ -82,6 +83,7 @@ class BasicModel:
         ]
 
     def compute_probabilities(self, c, err, *_):
+        err /= self.err_scale
         # read to kmer coverage
         ck = self.correct_c(c)
         # lambda for kmers with s errors
@@ -157,10 +159,10 @@ class BasicModel:
 
 
 class RepeatsModel(BasicModel):
-    def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
-        super(RepeatsModel, self).__init__(k, r, hist, max_error)
+    def __init__(self, k, r, hist, err_scale=1, max_error=None, max_cov=None, treshold=1e-8):
+        super(RepeatsModel, self).__init__(k, r, hist, err_scale, max_error)
         self.repeats = False
-        self.bounds = ((0.01, max_cov), (0.0, 0.5), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
+        self.bounds = ((0.01, max_cov), (0.0, 0.5*self.err_scale), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
         self.treshold = treshold
 
     def get_hist_treshold(self, b_o, treshold):

@@ -200,7 +200,7 @@ class CoverageEstimator:
         if estimated is not None:
             output_data['estimated_loglikelihood'] = -self.likelihood_f(estimated)
             output_data['estimated_coverage'] = estimated[0]
-            output_data['estimated_error_rate'] = estimated[1]
+            output_data['estimated_error_rate'] = estimated[1] / self.model.err_scale
             if repeats:
                 output_data['estimated_q1'] = estimated[2]
                 output_data['estimated_q2'] = estimated[3]
@@ -365,6 +365,7 @@ def main(args):
         model_class = BasicModel
     model = model_class(
         args.kmer_size, args.read_length, hist,
+        err_scale=config.ERR_SCALE,
         max_error=8, max_cov=args.max_coverage,
     )
 
@@ -401,6 +402,8 @@ def main(args):
             guess = [cov, e, q1, q2, q]
         else:
             guess = [cov, e]
+
+        guess[1] *= model.err_scale
 
         verbose_print('Initial guess: {} ll:{}'.format(
             guess, model.compute_loglikelihood(*guess)
