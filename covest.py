@@ -410,7 +410,7 @@ def main(args):
         estimator = CoverageEstimator(model, fix)
         res = estimator.compute_coverage(
             guess,
-            grid_search_type=CoverageEstimator.GRID_SEARCH_TYPE_PRE,
+            grid_search_type=args.grid,
             n_threads=args.thread_count,
         )
         reads_size = None
@@ -444,8 +444,8 @@ if __name__ == '__main__':
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
     parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=0,
                         help='Trim histogram automatically with this treshold')
-    parser.add_argument('-g', '--grid', action='store_true', default=False,
-                        help='Use grid search')
+    parser.add_argument('-g', '--grid', type=int, default=0,
+                        help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('-q1', type=float, help='q1')
