@@ -68,7 +68,9 @@ class BasicModel:
                 return res
             except (OverflowError, FloatingPointError) as e:
                 verbose_print(
-                    'Exception at l:{}, j:{}\n Consider histogram trimming\n{}'.format(l, j, e)
+                    'Precission error at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
+                        l, j, e
+                    )
                 )
                 return 0.0
 
