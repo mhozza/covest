@@ -172,7 +172,7 @@ class RepeatsModel(BasicModel):
         super(RepeatsModel, self).__init__(k, r, hist, max_error=max_error)
         self.repeats = False
         self.bounds = (
-            (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 0.999), (0.0, 0.999), (0.0, 0.999))
+            (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 1.0), (0.0, 0.999), (0.0, 0.999))
         self.threshold = threshold
 
     def get_hist_threshold(self, b_o, threshold):
