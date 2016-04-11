@@ -42,7 +42,7 @@ def get_trim(hist, precision=0):
     return trim
 
 
-def load_hist(fname, autotrim=None, trim=None):
+def load_hist(fname, auto_trim=None, trim=None):
     hist = defaultdict(int)
     max_hist = 0
 
@@ -55,14 +55,14 @@ def load_hist(fname, autotrim=None, trim=None):
             max_hist = max(max_hist, i)
 
     hist_l = [hist[b] for b in range(max_hist)]
-    hist_trimed = hist_l[:]
-    if autotrim is not None:
-        trim = get_trim(hist_l, autotrim)
+    hist_trimmed = hist_l[:]
+    if auto_trim is not None:
+        trim = get_trim(hist_l, auto_trim)
         verbose_print('Trimming at: {}'.format(trim))
-        hist_trimed = hist_l[:trim]
+        hist_trimmed = hist_l[:trim]
     elif trim is not None:
-        hist_trimed = hist_l[:trim]
-    return hist_l, hist_trimed
+        hist_trimmed = hist_l[:trim]
+    return hist_l, hist_trimmed
 
 
 @lru_cache(maxsize=None)
@@ -80,6 +80,12 @@ def count_reads_size(fname):
 
 
 def compute_coverage_apx(hist, k, r):
+    def fix_coverage(coverage):
+        return inverse(lambda c: (c - c * exp(-c)) / (1 - exp(-c) - c * exp(-c)))(coverage)
+
+    def kmer_to_read_coverage(coverage):
+        return coverage * r / (r - k + 1)
+
     observed_ones = hist[1]
     all_kmers = sum(i * h for i, h in enumerate(hist))
     total_unique_kmers = sum(h for h in hist)
@@ -93,9 +99,6 @@ def compute_coverage_apx(hist, k, r):
     # compute coverage from hist >=2
     try:
         cov = all_kmers / unique_kmers
-        # fix coverage
-        fn = lambda cov: (cov - cov * exp(-cov)) / (1 - exp(-cov) - cov * exp(-cov))
-        fix_coverage = inverse(fn)
         cov = fix_coverage(cov)
         # fix unique kmers
         unique_kmers /= (1.0 - exp(-cov) - cov * exp(-cov))
@@ -110,12 +113,15 @@ def compute_coverage_apx(hist, k, r):
         # return corrected coverage and error estimate
         if estimated_p > 0:
             # function for conversion between kmer and base coverage
-            kmer_to_read_coverage = lambda c: c * r / (r - k + 1)
             return float(kmer_to_read_coverage(cov / estimated_p)), float(e)
         else:
             return 0.0, float(e)
     except ZeroDivisionError:
         return 0.0, 1.0
+
+
+def safe_int(x):
+    return int(x) if x != float('inf') else None
 
 
 class CoverageEstimator:
@@ -135,15 +141,15 @@ class CoverageEstimator:
     def _optimize(self, r):
         return minimize(
             self.likelihood_f, r,
-            method=config.OPTIMALIZATION_METHOD,
+            method=config.OPTIMIZATION_METHOD,
             bounds=self.model.bounds,
             options={'disp': False}
         )
 
     def compute_coverage(
-        self,
-        guess,
-        grid_search_type=GRID_SEARCH_TYPE_PRE,
+            self,
+            guess,
+            grid_search_type=GRID_SEARCH_TYPE_PRE,
             n_threads=config.DEFAULT_THREAD_COUNT,
     ):
         r = guess
@@ -208,7 +214,6 @@ class CoverageEstimator:
                 if orig_q is None:
                     orig_q = estimated[4]
 
-            safe_int = lambda x: int(x) if x != float('inf') else None
             output_data['estimated_genome_size'] = safe_int(round(
                 sum(
                     i * h for i, h in enumerate(self.model.hist)
@@ -274,7 +279,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
         var_grids = [
             list(filter_bounds(generate_grid_single(var, fix[i]), i))
             for i, var in enumerate(args)
-        ]
+            ]
         return itertools.product(*var_grids)
 
     if fix is None:
@@ -314,7 +319,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     return min_args
 
 
-def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fix=None,):
+def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fix=None, ):
     def generate_grid(step):
         def apply_bounds(interval, i):
             if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
@@ -330,11 +335,11 @@ def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fi
         def generate_random_params():
             bounds = [
                 apply_bounds((var / step, var * step), i) for i, var in enumerate(initial_guess)
-            ]
+                ]
             return [
                 random.uniform(*interval) if fix is None or fix[i] is None else fix[i]
                 for i, interval in enumerate(bounds)
-            ]
+                ]
 
         if count < 1:
             grid = []
@@ -352,7 +357,7 @@ def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fi
 @running_time_decorator
 def main(args):
     hist_orig, hist = load_hist(
-        args.input_histogram, autotrim=args.autotrim, trim=args.trim
+        args.input_histogram, auto_trim=args.autotrim, trim=args.trim
     )
     # Model selection
     if args.repeats:

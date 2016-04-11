@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+
 from covest import load_hist
 
 if __name__ == '__main__':
@@ -10,4 +11,4 @@ if __name__ == '__main__':
                         help='Trim histogram automatically with this treshold')
 
     args = parser.parse_args()
-    print('Hist size:', len(load_hist(args.input_histogram, autotrim=args.autotrim)))
+    print('Hist size:', len(load_hist(args.input_histogram, auto_trim=args.autotrim)))

@@ -1,5 +1,6 @@
 import multiprocessing
 from functools import lru_cache
+from math import exp, log
 
 import matplotlib.pyplot as plt
 import numpy
@@ -7,15 +8,6 @@ from scipy.misc import comb
 
 import config
 from utils import verbose_print
-
-try:
-    if not config.USE_BIGFLOAT:
-        raise ImportError("USE_BIGFLOAT is false")
-    from bigfloat import BigFloat, exp, log
-except ImportError:
-    from math import exp, log
-
-    verbose_print('BigFloats are not used!\nPrecision issues may occur.')
 
 
 def fix_zero(x, val=1):
@@ -26,9 +18,35 @@ def fix_zero(x, val=1):
 
 
 def safe_log(x):
-    if x <= 0:
+    if x is None or x <= 0:
         return -config.INF
     return log(x)
+
+
+def tr_poisson(l, j):
+    if l == 0:
+        return 0.0
+    with numpy.errstate(over='raise'):
+        try:
+            p1 = 1.0
+            for i in range(1, j + 1):
+                p1 *= l / i
+            while l > config.MAX_EXP and p1 > 0:
+                p1 /= exp(config.MAX_EXP)
+                l -= config.MAX_EXP
+            if l > 1e-8 and p1 > 0:
+                p3 = exp(l) - 1.0
+            else:
+                p3 = l
+            res = p1 / p3
+            return res
+        except (OverflowError, FloatingPointError) as e:
+            verbose_print(
+                'Precission error at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
+                    l, j, e
+                )
+            )
+            return 0.0
 
 
 class BasicModel:
@@ -55,31 +73,6 @@ class BasicModel:
     def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
-    def _tr_poisson(self, l, j):
-        if l == 0:
-            return 0.0
-        with numpy.errstate(over='raise'):
-            try:
-                p1 = 1.0
-                for i in range(1, j + 1):
-                    p1 *= l / i
-                while l > config.MAX_EXP and p1 > 0:
-                    p1 /= exp(config.MAX_EXP)
-                    l -= config.MAX_EXP
-                if l > 1e-8 and p1 > 0:
-                    p3 = exp(l) - 1.0
-                else:
-                    p3 = l
-                res = p1 / p3
-                return res
-            except (OverflowError, FloatingPointError) as e:
-                verbose_print(
-                    'Precission error at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
-                        l, j, e
-                    )
-                )
-                return 0.0
-
     @lru_cache(maxsize=None)
     def _get_lambda_s(self, c, err):
         return [
@@ -102,7 +95,7 @@ class BasicModel:
         max_hist = len(self.hist)
         p_j = [None] + [
             sum(
-                a_s[s] * self._tr_poisson(l_s[s], j)
+                a_s[s] * tr_poisson(l_s[s], j)
                 for s in range(self.max_error)
             )
             for j in range(1, max_hist)
@@ -140,7 +133,7 @@ class BasicModel:
         if orig is not None and None not in orig:
             op = adjust_probs(self.compute_probabilities(*orig))
         else:
-            op = adjust_probs([0 for j in range(len(self.hist))])
+            op = adjust_probs([0 for _ in range(len(self.hist))])
 
         plt.yscale('log')
         plt.plot(
@@ -176,17 +169,18 @@ class RepeatsModel(BasicModel):
         self.repeats = False
         self.bounds = (
             (0.01, max_cov), (0.0, 0.5 * self.err_scale), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
-        self.treshold = treshold
+        self.threshold = treshold
 
-    def get_hist_treshold(self, b_o, treshold):
+    def get_hist_threshold(self, b_o, threshold):
         hist_size = len(self.hist)
-        if treshold is not None:
+        if threshold is not None:
             for o in range(1, hist_size):
-                if b_o(o) <= treshold:
+                if b_o(o) <= threshold:
                     return o
         return hist_size
 
-    def get_b_o(self, q1, q2, q):
+    @staticmethod
+    def get_b_o(q1, q2, q):
         o_2 = (1 - q1) * q2
         o_n = (1 - q1) * (1 - q2) * q
 
@@ -202,35 +196,38 @@ class RepeatsModel(BasicModel):
 
         return b_o
 
-    def compute_probabilities(self, c, err, q1, q2, q):
+    # noinspection PyMethodOverriding
+    def compute_probabilities(self, c, err, q1, q2, q, *_):
         b_o = self.get_b_o(q1, q2, q)
-        treshold_o = self.get_hist_treshold(b_o, self.treshold)
+        threshold_o = self.get_hist_threshold(b_o, self.threshold)
         # read to kmer coverage
         c = self.correct_c(c)
         # lambda for kmers with s errors
         l_s = self._get_lambda_s(c, err)
         # expected probability of kmers with s errors and coverage >= 1
+        # noinspection PyTypeChecker
         n_os = [None] + [
             [self.comb[s] * (1.0 - exp(o * -l_s[s])) for s in range(self.max_error)]
-            for o in range(1, treshold_o)
+            for o in range(1, threshold_o)
             ]
         sum_n_os = [None] + [
-            fix_zero(sum(n_os[o][t] for t in range(self.max_error))) for o in range(1, treshold_o)
+            fix_zero(sum(n_os[o][t] for t in range(self.max_error))) for o in range(1, threshold_o)
             ]
 
         # portion of kmers wit1h s errors
+        # noinspection PyTypeChecker
         a_os = [None] + [
             [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(self.max_error)]
-            for o in range(1, treshold_o)
+            for o in range(1, threshold_o)
             ]
         # probability that unique kmer has coverage j (j > 0)
         p_j = [None] + [
             sum(
                 b_o(o) * sum(
-                    a_os[o][s] * self._tr_poisson(o * l_s[s], j)
+                    a_os[o][s] * tr_poisson(o * l_s[s], j)
                     for s in range(self.max_error)
                 )
-                for o in range(1, treshold_o)
+                for o in range(1, threshold_o)
             )
             for j in range(1, len(self.hist))
             ]
