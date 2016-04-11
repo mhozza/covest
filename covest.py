@@ -18,11 +18,6 @@ from models import BasicModel, RepeatsModel
 from perf import running_time, running_time_decorator
 from utils import verbose_print
 
-# defaults
-DEFAULT_K = 21
-DEFAULT_READ_LENGTH = 100
-DEFAULT_REPEAT_MODEL = 0
-
 
 def estimate_p(cc, alpha):
     return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
@@ -285,7 +280,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
         var_grids = [
             list(filter_bounds(generate_grid_single(var, fix[i]), i))
             for i, var in enumerate(args)
-            ]
+        ]
         return itertools.product(*var_grids)
 
     if fix is None:
@@ -341,11 +336,11 @@ def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fi
         def generate_random_params():
             bounds = [
                 apply_bounds((var / step, var * step), i) for i, var in enumerate(initial_guess)
-                ]
+            ]
             return [
                 random.uniform(*interval) if fix is None or fix[i] is None else fix[i]
                 for i, interval in enumerate(bounds)
-                ]
+            ]
 
         if count < 1:
             grid = []
@@ -375,6 +370,7 @@ def main(args):
     model = model_class(
         args.kmer_size, args.read_length, hist,
         max_error=8, max_cov=args.max_coverage,
+        min_single_copy_ratio=args.min_q1,
     )
 
     orig = [args.coverage, args.error_rate, args.q1, args.q2, args.q]
@@ -444,9 +440,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
     parser.add_argument('input_histogram', help='Input histogram')
     parser.add_argument('-k', '--kmer-size', type=int,
-                        default=DEFAULT_K, help='Kmer size')
+                        default=config.DEFAULT_K, help='Kmer size')
     parser.add_argument('-r', '--read-length', type=int,
-                        default=DEFAULT_READ_LENGTH, help='Read length')
+                        default=config.DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('--plot', action='store_true', help='Plot probabilities')
     parser.add_argument('-rp', '--repeats', action='store_true', help='Estimate with repeats')
     parser.add_argument('-ll', '--ll-only', action='store_true',
@@ -454,12 +450,14 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
     parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=0,
-                        help='Trim histogram automatically with this treshold')
+                        help='Trim histogram automatically with this threshold')
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('-q1', type=float, help='q1')
+    parser.add_argument('-mq1', '--min-q1', type=float, default=config.DEFAULT_MIN_SINGLECOPY_RATIO,
+                        help='minimum single copy ratio')
     parser.add_argument('-q2', type=float, help='q2')
     parser.add_argument('-q', type=float, help='q')
     parser.add_argument('-so', '--start-original', action='store_true',

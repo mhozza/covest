@@ -51,7 +51,7 @@ def tr_poisson(l, j):
 
 
 class BasicModel:
-    def __init__(self, k, r, hist, max_error=None, max_cov=None):
+    def __init__(self, k, r, hist, max_error=None, max_cov=None, *args, **kwargs):
         self.repeats = False
         self.k = k
         self.r = r
@@ -96,7 +96,7 @@ class BasicModel:
         p_j = [None] + [
             sum(
                 a_s[s] * tr_poisson(l_s[s], j)
-                for s in range(self.max_error)
+                    for s in range(self.max_error)
             )
             for j in range(1, max_hist)
         ]
@@ -108,8 +108,8 @@ class BasicModel:
         p_j = self.compute_probabilities(*args)
         return float(sum(
             self.hist[j] * safe_log(p_j[j])
-            for j in range(1, len(self.hist))
-            if self.hist[j]
+                for j in range(1, len(self.hist))
+                if self.hist[j]
         ))
 
     def compute_loglikelihood_multi(self, args_list, thread_count=config.DEFAULT_THREAD_COUNT):
@@ -120,7 +120,7 @@ class BasicModel:
             likelihoods = pool.starmap(self.compute_loglikelihood, args_list)
         return {
             tuple(args): likelihood for args, likelihood in zip(args_list, likelihoods)
-            }
+        }
 
     def plot_probs(self, est, guess, orig):
         def fmt(p):
@@ -167,12 +167,13 @@ class BasicModel:
 
 
 class RepeatsModel(BasicModel):
-    def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
+    def __init__(self, k, r, hist, max_error=None, max_cov=None, threshold=1e-8,
+                 min_single_copy_ratio=0.3, *args, **kwargs):
         super(RepeatsModel, self).__init__(k, r, hist, max_error=max_error)
         self.repeats = False
         self.bounds = (
-            (0.01, max_cov), (0.0, 0.5), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
-        self.threshold = treshold
+            (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 0.999), (0.0, 0.999), (0.0, 0.999))
+        self.threshold = threshold
 
     def get_hist_threshold(self, b_o, threshold):
         hist_size = len(self.hist)
@@ -196,6 +197,7 @@ class RepeatsModel(BasicModel):
                 return o_2
             else:
                 return o_n * (1 - q) ** (o - 3)
+
         return b_o
 
     # noinspection PyMethodOverriding
@@ -227,9 +229,9 @@ class RepeatsModel(BasicModel):
             sum(
                 b_o(o) * sum(
                     a_os[o][s] * tr_poisson(o * l_s[s], j)
-                    for s in range(self.max_error)
+                        for s in range(self.max_error)
                 )
-                for o in range(1, threshold_o)
+                    for o in range(1, threshold_o)
             )
             for j in range(1, len(self.hist))
         ]
