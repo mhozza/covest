@@ -128,6 +128,8 @@ class CoverageEstimator:
         self.model = model
         self.fix = fix
         self.err_scale = err_scale
+        self.bounds = list(self.model.bounds)
+        self.bounds[1] = self.bounds[1][0], self.bounds[1][1] * self.err_scale
 
     def likelihood_f(self, x):
         args = list(x)
@@ -137,12 +139,11 @@ class CoverageEstimator:
         return -self.model.compute_loglikelihood(*args)
 
     def _optimize(self, r):
-        bounds = list(self.model.bounds)
-        bounds[1] = bounds[1][0], bounds[1][1] * self.err_scale
+
         return minimize(
             self.likelihood_f, r,
             method=config.OPTIMIZATION_METHOD,
-            bounds=bounds,
+            bounds=self.bounds,
             options={'disp': False}
         )
 
@@ -153,16 +154,18 @@ class CoverageEstimator:
             n_threads=config.DEFAULT_THREAD_COUNT,
     ):
         r = guess
+        r[1] *= self.err_scale
+
         success = True
         try:
-            verbose_print('Bounds: {}'.format(self.model.bounds))
+            verbose_print('Bounds: {}'.format(self.bounds))
             if grid_search_type == self.GRID_SEARCH_TYPE_NONE:
                 with running_time('First optimalization'):
                     res = self._optimize(r)
                     r = res.x
                     success = res.success
             else:
-                params = initial_grid(r, bounds=self.model.bounds)
+                params = initial_grid(r, bounds=self.bounds)
                 with running_time('Initial grid optimalization'):
                     min_r = None
                     with Pool(n_threads) as pool:
@@ -176,7 +179,7 @@ class CoverageEstimator:
             if grid_search_type == self.GRID_SEARCH_TYPE_POST and not success:
                 verbose_print('Starting grid search with guess: {}'.format(r))
                 r = optimize_grid(
-                    self.likelihood_f, r, bounds=self.model.bounds,
+                    self.likelihood_f, r, bounds=self.bounds,
                     fix=self.fix, n_threads=n_threads,
                 )
             return r
@@ -405,8 +408,6 @@ def main(args):
             guess = [cov, e, q1, q2, q]
         else:
             guess = [cov, e]
-
-        guess[1] *= err_scale
 
         verbose_print('Initial guess: {} ll:{}'.format(
             guess, model.compute_loglikelihood(*guess)
