@@ -1,3 +1,4 @@
+import itertools
 import multiprocessing
 from functools import lru_cache
 from math import exp, log
@@ -50,12 +51,11 @@ def tr_poisson(l, j):
 
 
 class BasicModel:
-    def __init__(self, k, r, hist, err_scale=1, max_error=None, max_cov=None):
+    def __init__(self, k, r, hist, max_error=None, max_cov=None):
         self.repeats = False
         self.k = k
         self.r = r
-        self.err_scale = err_scale
-        self.bounds = ((0.01, max_cov), (0.0, 0.5 * self.err_scale))
+        self.bounds = ((0.01, max_cov), (0.0, 0.5))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
         self.hist = hist
         if max_error is None:
@@ -63,8 +63,10 @@ class BasicModel:
         else:
             self.max_error = min(self.k + 1, max_error)
 
-    def _check_bounds(self, args):
+    def check_bounds(self, args):
         for arg, (l, r) in zip(args, self.bounds):
+            if arg == float('NaN'):
+                return False
             if (l is not None and arg < l) or (r is not None and arg > r):
                 return False
         return True
@@ -80,7 +82,6 @@ class BasicModel:
         ]
 
     def compute_probabilities(self, c, err, *_):
-        err /= self.err_scale
         # read to kmer coverage
         ck = self.correct_c(c)
         # lambda for kmers with s errors
@@ -102,7 +103,7 @@ class BasicModel:
         return p_j
 
     def compute_loglikelihood(self, *args):
-        if not self._check_bounds(args):
+        if not self.check_bounds(args):
             return -config.INF
         p_j = self.compute_probabilities(*args)
         return float(sum(
@@ -112,8 +113,11 @@ class BasicModel:
         ))
 
     def compute_loglikelihood_multi(self, args_list, thread_count=config.DEFAULT_THREAD_COUNT):
-        pool = multiprocessing.Pool(processes=thread_count)
-        likelihoods = pool.starmap(self.compute_loglikelihood, args_list)
+        if thread_count is None:  # do not use multiprocessing
+            likelihoods = itertools.starmap(self.compute_loglikelihood, args_list)
+        else:
+            pool = multiprocessing.Pool(processes=thread_count)
+            likelihoods = pool.starmap(self.compute_loglikelihood, args_list)
         return {
             tuple(args): likelihood for args, likelihood in zip(args_list, likelihoods)
             }
@@ -163,11 +167,11 @@ class BasicModel:
 
 
 class RepeatsModel(BasicModel):
-    def __init__(self, k, r, hist, err_scale=1, max_error=None, max_cov=None, treshold=1e-8):
-        super(RepeatsModel, self).__init__(k, r, hist, err_scale, max_error)
+    def __init__(self, k, r, hist, max_error=None, max_cov=None, treshold=1e-8):
+        super(RepeatsModel, self).__init__(k, r, hist, max_error=max_error)
         self.repeats = False
         self.bounds = (
-            (0.01, max_cov), (0.0, 0.5 * self.err_scale), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
+            (0.01, max_cov), (0.0, 0.5), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
         self.threshold = treshold
 
     def get_hist_threshold(self, b_o, threshold):

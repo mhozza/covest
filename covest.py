@@ -129,20 +129,26 @@ class CoverageEstimator:
     GRID_SEARCH_TYPE_PRE = 1
     GRID_SEARCH_TYPE_POST = 2
 
-    def __init__(self, model, fix=None):
+    def __init__(self, model, err_scale=config.ERR_SCALE, fix=None):
         self.model = model
         self.fix = fix
+        self.err_scale = err_scale
 
     def likelihood_f(self, x):
+        args = list(x)
+        print(args)
         if self.fix is not None:
-            x = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(x)]
-        return -self.model.compute_loglikelihood(*x)
+            args = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(args)]
+        args[1] /= self.err_scale
+        return -self.model.compute_loglikelihood(*args)
 
     def _optimize(self, r):
+        bounds = list(self.model.bounds)
+        bounds[1] = bounds[1][0], bounds[1][1] * self.err_scale
         return minimize(
             self.likelihood_f, r,
             method=config.OPTIMIZATION_METHOD,
-            bounds=self.model.bounds,
+            bounds=bounds,
             options={'disp': False}
         )
 
@@ -202,7 +208,7 @@ class CoverageEstimator:
         if estimated is not None:
             output_data['estimated_loglikelihood'] = -self.likelihood_f(estimated)
             output_data['estimated_coverage'] = estimated[0]
-            output_data['estimated_error_rate'] = estimated[1] / self.model.err_scale
+            output_data['estimated_error_rate'] = estimated[1] / self.err_scale
             if repeats:
                 output_data['estimated_q1'] = estimated[2]
                 output_data['estimated_q2'] = estimated[3]
@@ -359,6 +365,8 @@ def main(args):
     hist_orig, hist = load_hist(
         args.input_histogram, auto_trim=args.autotrim, trim=args.trim
     )
+    err_scale = config.ERR_SCALE
+
     # Model selection
     if args.repeats:
         model_class = RepeatsModel
@@ -366,7 +374,6 @@ def main(args):
         model_class = BasicModel
     model = model_class(
         args.kmer_size, args.read_length, hist,
-        err_scale=config.ERR_SCALE,
         max_error=8, max_cov=args.max_coverage,
     )
 
@@ -404,14 +411,14 @@ def main(args):
         else:
             guess = [cov, e]
 
-        guess[1] *= model.err_scale
+        guess[1] *= err_scale
 
         verbose_print('Initial guess: {} ll:{}'.format(
             guess, model.compute_loglikelihood(*guess)
         ))
 
         fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
-        estimator = CoverageEstimator(model, fix)
+        estimator = CoverageEstimator(model, err_scale=err_scale, fix=fix)
         res = estimator.compute_coverage(
             guess,
             grid_search_type=args.grid,

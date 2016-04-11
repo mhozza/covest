@@ -8,7 +8,7 @@ OPTIMIZATION_METHOD = 'L-BFGS-B'
 # OPTIMIZATION_METHOD  = 'TNC'
 INITIAL_GRID_COUNT = 16
 INITIAL_GRID_STEP = 3
-ERR_SCALE = 1
+ERR_SCALE = 100
 try:
     from multiprocessing import cpu_count
 
