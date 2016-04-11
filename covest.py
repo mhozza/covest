@@ -243,6 +243,8 @@ class CoverageEstimator:
                     [orig_coverage, orig_error_rate]
                 )
 
+        output_data['hist_size'] = len(self.model.hist)
+
         if not silent:
             print(json.dumps(
                 output_data, sort_keys=True, indent=4, separators=(',', ': ')
