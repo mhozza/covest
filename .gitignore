@@ -10,3 +10,4 @@ bamUtil/
 *.kh
 *.kh.info
 .venv
+.idea/
