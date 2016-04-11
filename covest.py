@@ -131,7 +131,6 @@ class CoverageEstimator:
 
     def likelihood_f(self, x):
         args = list(x)
-        print(args)
         if self.fix is not None:
             args = [j if self.fix[i] is None else self.fix[i] for i, j in enumerate(args)]
         args[1] /= self.err_scale
