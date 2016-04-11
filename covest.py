@@ -7,7 +7,7 @@ import random
 from collections import defaultdict
 from functools import lru_cache
 from math import exp
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 from os import path
 
 from scipy.optimize import minimize
@@ -22,10 +22,6 @@ from utils import verbose_print
 DEFAULT_K = 21
 DEFAULT_READ_LENGTH = 100
 DEFAULT_REPEAT_MODEL = 0
-try:
-    DEFAULT_THREAD_COUNT = cpu_count()
-except NotImplementedError:
-    DEFAULT_THREAD_COUNT = 2
 
 
 def estimate_p(cc, alpha):
@@ -148,7 +144,7 @@ class CoverageEstimator:
         self,
         guess,
         grid_search_type=GRID_SEARCH_TYPE_PRE,
-        n_threads=DEFAULT_THREAD_COUNT,
+            n_threads=config.DEFAULT_THREAD_COUNT,
     ):
         r = guess
         success = True
@@ -255,7 +251,7 @@ def unpack_call(args):
 
 @running_time_decorator
 def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
-                  n_threads=DEFAULT_THREAD_COUNT):
+                  n_threads=config.DEFAULT_THREAD_COUNT):
     def generate_grid(args, step, max_depth):
         def generate_grid_single(var, fix=None):
             if fix is None:
@@ -292,7 +288,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     diff = 1
     n_iter = 0
     try:
-        while (diff > 0.1 or step > 1.001):
+        while diff > 0.1 or step > 1.001:
             n_iter += 1
             diff = 0.0
             grid = list(generate_grid(min_args, step, grid_depth))
@@ -379,7 +375,7 @@ def main(args):
     else:
         verbose_print('Estimating coverage for {}'.format(args.input_histogram))
         if args.start_original:
-            if (args.repeats):
+            if args.repeats:
                 cov, e, q1, q2, q = orig
             else:
                 cov, e = orig
@@ -458,7 +454,7 @@ if __name__ == '__main__':
                         help='Start form given values')
     parser.add_argument('-f', '--fix', action='store_true',
                         help='Fix some vars, optimize others')
-    parser.add_argument('-T', '--thread-count', default=DEFAULT_THREAD_COUNT, type=int,
+    parser.add_argument('-T', '--thread-count', default=config.DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
     parser.add_argument('-s', '--genome-size', help='Calculate genome size from reads')
 

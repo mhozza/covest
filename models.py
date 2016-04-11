@@ -1,9 +1,12 @@
-from scipy.misc import comb
-import matplotlib.pyplot as plt
+import multiprocessing
 from functools import lru_cache
+
+import matplotlib.pyplot as plt
 import numpy
-from utils import verbose_print
+from scipy.misc import comb
+
 import config
+from utils import verbose_print
 
 try:
     if not config.USE_BIGFLOAT:
@@ -11,6 +14,7 @@ try:
     from bigfloat import BigFloat, exp, log
 except ImportError:
     from math import exp, log
+
     verbose_print('BigFloats are not used!\nPrecision issues may occur.')
 
 
@@ -36,6 +40,7 @@ class BasicModel:
         self.bounds = ((0.01, max_cov), (0.0, 0.5 * self.err_scale))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
         self.hist = hist
+
         if max_error is None:
             self.max_error = self.k + 1
         else:
@@ -80,7 +85,7 @@ class BasicModel:
         return [
             c * (3 ** -s) * (1.0 - err) ** (self.k - s) * err ** s
             for s in range(self.max_error)
-        ]
+            ]
 
     def compute_probabilities(self, c, err, *_):
         err /= self.err_scale
@@ -101,7 +106,7 @@ class BasicModel:
                 for s in range(self.max_error)
             )
             for j in range(1, max_hist)
-        ]
+            ]
         return p_j
 
     def compute_loglikelihood(self, *args):
@@ -114,10 +119,12 @@ class BasicModel:
             if self.hist[j]
         ))
 
-    def compute_loglikelihood_multi(self, args_list):
+    def compute_loglikelihood_multi(self, args_list, thread_count=config.DEFAULT_THREAD_COUNT):
+        pool = multiprocessing.Pool(processes=thread_count)
+        likelihoods = pool.starmap(self.compute_loglikelihood, args_list)
         return {
-            tuple(args): self.compute_loglikelihood(*args) for args in args_list
-        }
+            tuple(args): likelihood for args, likelihood in zip(args_list, likelihoods)
+            }
 
     def plot_probs(self, est, guess, orig):
         def fmt(p):
@@ -167,7 +174,8 @@ class RepeatsModel(BasicModel):
     def __init__(self, k, r, hist, err_scale=1, max_error=None, max_cov=None, treshold=1e-8):
         super(RepeatsModel, self).__init__(k, r, hist, err_scale, max_error)
         self.repeats = False
-        self.bounds = ((0.01, max_cov), (0.0, 0.5*self.err_scale), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
+        self.bounds = (
+            (0.01, max_cov), (0.0, 0.5 * self.err_scale), (0.0, 0.999), (0.0, 0.999), (0.0, 0.999))
         self.treshold = treshold
 
     def get_hist_treshold(self, b_o, treshold):
@@ -191,6 +199,7 @@ class RepeatsModel(BasicModel):
                 return o_2
             else:
                 return o_n * (1 - q) ** (o - 3)
+
         return b_o
 
     def compute_probabilities(self, c, err, q1, q2, q):
@@ -204,16 +213,16 @@ class RepeatsModel(BasicModel):
         n_os = [None] + [
             [self.comb[s] * (1.0 - exp(o * -l_s[s])) for s in range(self.max_error)]
             for o in range(1, treshold_o)
-        ]
+            ]
         sum_n_os = [None] + [
             fix_zero(sum(n_os[o][t] for t in range(self.max_error))) for o in range(1, treshold_o)
-        ]
+            ]
 
         # portion of kmers wit1h s errors
         a_os = [None] + [
             [n_os[o][s] / (sum_n_os[o] if sum_n_os[o] != 0 else 1) for s in range(self.max_error)]
             for o in range(1, treshold_o)
-        ]
+            ]
         # probability that unique kmer has coverage j (j > 0)
         p_j = [None] + [
             sum(
@@ -224,5 +233,5 @@ class RepeatsModel(BasicModel):
                 for o in range(1, treshold_o)
             )
             for j in range(1, len(self.hist))
-        ]
+            ]
         return p_j

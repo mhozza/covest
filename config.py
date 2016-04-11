@@ -9,3 +9,9 @@ OPTIMALIZATION_METHOD = 'L-BFGS-B'
 INITIAL_GRID_COUNT = 16
 INITIAL_GRID_STEP = 3
 ERR_SCALE = 1
+try:
+    from multiprocessing import cpu_count
+
+    DEFAULT_THREAD_COUNT = cpu_count()
+except NotImplementedError:
+    DEFAULT_THREAD_COUNT = 2
