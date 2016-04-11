@@ -114,6 +114,11 @@ class BasicModel:
             if self.hist[j]
         ))
 
+    def compute_loglikelihood_multi(self, args_list):
+        return {
+            tuple(args): self.compute_loglikelihood(*args) for args in args_list
+        }
+
     def plot_probs(self, est, guess, orig):
         def fmt(p):
             return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20]]
