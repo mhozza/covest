@@ -9,10 +9,9 @@ source = 'data/ecoli2.fa'
 source = 'data/yeast/chrXV.fa'
 source = 'data/prame-partial-hg38.fa'
 
-simulator = 'art_bin_VanillaIceCream/art_illumina -i {src} -o {infile_base} -f {cov} -l 100 -ef'
-simulator_ef = './sam_to_fasta.py {infile_base}_errFree.sam'
+simulator = 'art_bin_VanillaIceCream/art_illumina -i {src} -o {infile_base} -f {cov} -l 100'
 simulator_simple = './read_simulator.py {src} {infile_base}.fa'\
-                   ' -f {infile_base_ef}.fa -e 0.03 -c {cov}'
+                   ' -e 0.03 -c {cov}'
 
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o {infile}.jf'
 jellyfish_hist = 'jellyfish histo {infile}.jf_0 -o {infile_base}_k{k}.dist'
@@ -35,7 +34,6 @@ USE_SIMPLE_SIMULATOR = False
 generate = False
 generate_dist = True
 use_jellyfish = True
-ef = False
 run_khmer = False
 run_rep = False
 run_norep = False
@@ -65,32 +63,19 @@ if __name__ == '__main__':
 
         if USE_SIMPLE_SIMULATOR:
             params['infile_base'] = infile_base
-            params['infile_base_ef'] = infile_base + 'f'
             params['infile'] = '{}.fa'.format(params['infile_base'])
-            params['infile_ef'] = '{}.fa'.format(params['infile_base_ef'])
         else:
             params['infile_base'] = infile_base
-            params['infile_base_ef'] = infile_base + 'f'
             params['infile'] = '{}.fastq'.format(params['infile_base'])
-            params['infile_ef'] = '{}_errFree.fa'.format(params['infile_base'])
 
         if generate:
             if USE_SIMPLE_SIMULATOR:
                 run(simulator_simple.format(**params))
             else:
                 run(simulator.format(**params))
-                if ef:
-                    run(simulator_ef.format(**params))
-                # run('rm {path}/*.sam {path}/*.aln'.format(path=path))
-
         for k in ks:
             params['k'] = k
             pp = [params]
-            if ef:
-                params2 = deepcopy(params)
-                params2['infile'] = params2['infile_ef']
-                params2['infile_base'] = params2['infile_base_ef']
-                pp.append(params2)
             for p in pp:
                 if generate_dist:
                     if use_jellyfish:
