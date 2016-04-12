@@ -395,7 +395,7 @@ def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fi
 @running_time_decorator
 def main(args):
     hist_orig, hist = load_hist(
-        args.input_histogram, auto_trim=args.autotrim, trim=args.trim
+        args.input_histogram, auto_trim=args.auto_trim, trim=args.trim
     )
     err_scale = args.error_scale
 
@@ -493,7 +493,7 @@ if __name__ == '__main__':
                         help='Only compute log likelihood')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
-    parser.add_argument('-at', '--autotrim', type=int, nargs='?', const=0,
+    parser.add_argument('-at', '--auto-trim', type=int, nargs='?', const=0,
                         help='Trim histogram automatically with this threshold')
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')

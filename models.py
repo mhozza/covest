@@ -97,8 +97,7 @@ class BasicModel:
         max_hist = len(self.hist)
         p_j = [None] + [
             sum(
-                a_s[s] * tr_poisson(l_s[s], j)
-                    for s in range(self.max_error)
+                a_s[s] * tr_poisson(l_s[s], j) for s in range(self.max_error)
             )
             for j in range(1, max_hist)
         ]
@@ -109,9 +108,7 @@ class BasicModel:
             return -config.INF
         p_j = self.compute_probabilities(*args)
         return float(sum(
-            self.hist[j] * safe_log(p_j[j])
-                for j in range(1, len(self.hist))
-                if self.hist[j]
+            self.hist[j] * safe_log(p_j[j]) for j in range(1, len(self.hist)) if self.hist[j]
         ))
 
     def compute_loglikelihood_multi(self, args_list, thread_count=config.DEFAULT_THREAD_COUNT):
@@ -233,11 +230,8 @@ class RepeatsModel(BasicModel):
         p_j = [None] + [
             sum(
                 b_o(o) * sum(
-                    a_os[o][s] * tr_poisson(o * l_s[s], j)
-                        for s in range(self.max_error)
-                )
-                    for o in range(1, threshold_o)
-            )
-            for j in range(1, len(self.hist))
+                    a_os[o][s] * tr_poisson(o * l_s[s], j) for s in range(self.max_error)
+                ) for o in range(1, threshold_o)
+            ) for j in range(1, len(self.hist))
         ]
         return p_j
