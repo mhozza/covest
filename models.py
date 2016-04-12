@@ -43,7 +43,7 @@ def tr_poisson(l, j):
             return res
         except (OverflowError, FloatingPointError) as e:
             verbose_print(
-                'Precission error at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
+                'Precision error at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
                     l, j, e
                 )
             )
@@ -65,6 +65,8 @@ class BasicModel:
 
     def check_bounds(self, args):
         for arg, (l, r) in zip(args, self.bounds):
+            if arg is None:
+                continue
             if arg == float('NaN'):
                 return False
             if (l is not None and arg < l) or (r is not None and arg > r):
@@ -122,12 +124,15 @@ class BasicModel:
             tuple(args): likelihood for args, likelihood in zip(args_list, likelihoods)
         }
 
-    def plot_probs(self, est, guess, orig):
+    def plot_probs(self, est, guess, orig, cumulative=False):
         def fmt(p):
             return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20]]
 
         def adjust_probs(probs):
-            return [0 if p is None else i * p for i, p in enumerate(probs)]
+            if cumulative:
+                return [0 if p is None else i * p for i, p in enumerate(probs)]
+            else:
+                return probs
 
         hs = float(sum(self.hist))
         hp = adjust_probs([f / hs for f in self.hist])
@@ -170,7 +175,7 @@ class RepeatsModel(BasicModel):
     def __init__(self, k, r, hist, max_error=None, max_cov=None, threshold=1e-8,
                  min_single_copy_ratio=0.3, *args, **kwargs):
         super(RepeatsModel, self).__init__(k, r, hist, max_error=max_error)
-        self.repeats = False
+        self.repeats = True
         self.bounds = (
             (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 1.0), (0.0, 0.999), (0.0, 0.999))
         self.threshold = threshold

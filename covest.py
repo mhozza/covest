@@ -4,7 +4,7 @@ import itertools
 import json
 import pickle
 import random
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from functools import lru_cache
 from math import exp
 from multiprocessing import Pool
@@ -153,7 +153,7 @@ class CoverageEstimator:
             grid_search_type=GRID_SEARCH_TYPE_PRE,
             n_threads=config.DEFAULT_THREAD_COUNT,
     ):
-        r = guess
+        r = list(guess)
         r[1] *= self.err_scale
 
         success = True
@@ -162,8 +162,13 @@ class CoverageEstimator:
             if grid_search_type == self.GRID_SEARCH_TYPE_NONE:
                 with running_time('First optimization'):
                     res = self._optimize(r)
-                    r = res.x
                     success = res.success
+                    if not success:
+                        verbose_print(
+                            'Optimization unsuccessful.\n'
+                            'Initial params:{}\nResult{}'.format(r, res)
+                        )
+                    r = res.x
             else:
                 params = initial_grid(r, bounds=self.bounds)
                 with running_time('Initial grid optimization'):
@@ -173,8 +178,13 @@ class CoverageEstimator:
                     for res in results:
                         if min_r is None or min_r > res.fun:
                             min_r = res.fun
-                            r = res.x
                             success = res.success
+                            if not success:
+                                verbose_print(
+                                    'Optimization unsuccessful.\n'
+                                    'Initial params:{}\nResult{}'.format(r, res)
+                                )
+                            r = res.x
 
             if grid_search_type == self.GRID_SEARCH_TYPE_POST and not success:
                 verbose_print('Starting grid search with guess: {}'.format(r))
@@ -182,9 +192,10 @@ class CoverageEstimator:
                     self.likelihood_f, r, bounds=self.bounds,
                     fix=self.fix, n_threads=n_threads,
                 )
-            return r
         except KeyboardInterrupt:
-            return r
+            pass
+        r[1] /= self.err_scale
+        return r
 
     def print_output(self, estimated=None, guess=None,
                      orig_coverage=None, orig_error_rate=None,
@@ -205,7 +216,7 @@ class CoverageEstimator:
         if estimated is not None:
             output_data['estimated_loglikelihood'] = -self.likelihood_f(estimated)
             output_data['estimated_coverage'] = estimated[0]
-            output_data['estimated_error_rate'] = estimated[1] / self.err_scale
+            output_data['estimated_error_rate'] = estimated[1]
             if repeats:
                 output_data['estimated_q1'] = estimated[2]
                 output_data['estimated_q2'] = estimated[3]
@@ -251,6 +262,28 @@ class CoverageEstimator:
             ))
 
         return output_data
+
+
+def parse_data(data):
+    model_class_name = data['model']
+
+    guess = list()
+    guess.append(data.get('guessed_coverage', None))
+    guess.append(data.get('guessed_error_rate', None))
+    if model_class_name == 'RepeatsModel':
+        guess.append(data.get('guessed_q1', None))
+        guess.append(data.get('guessed_q2', None))
+        guess.append(data.get('guessed_q', None))
+
+    estimated = list()
+    estimated.append(data.get('estimated_coverage', None))
+    estimated.append(data.get('estimated_error_rate', None))
+    if model_class_name == 'RepeatsModel':
+        estimated.append(data.get('estimated_q1', None))
+        estimated.append(data.get('estimated_q2', None))
+        estimated.append(data.get('estimated_q', None))
+
+    return namedtuple('ParsedData', ('estimated', 'guess'))(estimated=estimated, guess=guess)
 
 
 def unpack_call(args):
@@ -385,67 +418,76 @@ def main(args):
         ll = model.compute_loglikelihood(*orig)
         print('Loglikelihood:', ll)
     else:
-        verbose_print('Estimating coverage for {}'.format(args.input_histogram))
-        if args.start_original:
-            if args.repeats:
-                cov, e, q1, q2, q = orig
+        if args.load:
+            with open(args.load) as f:
+                data = json.load(f)
+                parsed_data = parse_data(data)
+                guess = parsed_data.guess
+                res = parsed_data.estimated
+        else:
+            verbose_print('Estimating coverage for {}'.format(args.input_histogram))
+            if args.start_original:
+                if args.repeats:
+                    cov, e, q1, q2, q = orig
+                else:
+                    cov, e = orig
             else:
-                cov, e = orig
-        else:
-            # Compute initial guess
-            cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
-            if cov == 0 and e == 1:
-                # We were unable to guess cov and e.
-                # Try to estimate from some fixed valid data instead.
-                cov, e = 1, 0.5
-            if args.fix:
-                if args.coverage is not None:
-                    cov = args.coverage
-                if args.error_rate is not None:
-                    e = args.error_rate
-            q1, q2, q = [0.5 if i is None else i for i in [args.q1, args.q2, args.q]]
+                # Compute initial guess
+                cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
+                if cov == 0 and e == 1:
+                    # We were unable to guess cov and e.
+                    # Try to estimate from some fixed valid data instead.
+                    cov, e = 1, 0.5
+                if args.fix:
+                    if args.coverage is not None:
+                        cov = args.coverage
+                    if args.error_rate is not None:
+                        e = args.error_rate
+                q1, q2, q = [0.5 if i is None else i for i in [args.q1, args.q2, args.q]]
 
-        # Initial guess
-        if args.repeats:
-            guess = [cov, e, q1, q2, q]
-        else:
-            guess = [cov, e]
+            # Initial guess
+            if args.repeats:
+                guess = [cov, e, q1, q2, q]
+            else:
+                guess = [cov, e]
 
-        verbose_print('Initial guess: {} ll:{}'.format(
-            guess, model.compute_loglikelihood(*guess)
-        ))
+            verbose_print('Initial guess: {} ll:{}'.format(
+                guess, model.compute_loglikelihood(*guess)
+            ))
 
-        fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
-        estimator = CoverageEstimator(model, err_scale=err_scale, fix=fix)
-        res = estimator.compute_coverage(
-            guess,
-            grid_search_type=args.grid,
-            n_threads=args.thread_count,
-        )
-        reads_size = None
-        if args.genome_size is not None:
-            # genome_size contains read file name
-            reads_size = count_reads_size(args.genome_size)
+            fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
+            estimator = CoverageEstimator(model, err_scale=err_scale, fix=fix)
+            res = estimator.compute_coverage(
+                guess,
+                grid_search_type=args.grid,
+                n_threads=args.thread_count,
+            )
+            reads_size = None
+            if args.genome_size is not None:
+                # genome_size contains read file name
+                reads_size = count_reads_size(args.genome_size)
 
-        estimator.print_output(
-            res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
-            repeats=args.repeats, reads_size=reads_size,
-        )
+            estimator.print_output(
+                res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
+                repeats=args.repeats, reads_size=reads_size,
+            )
 
-        if args.plot:
+        if args.plot is not None:
             model.plot_probs(
-                res, guess, orig,
+                res, guess, orig, cumulative=args.plot,
             )
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
-    parser.add_argument('input_histogram', help='Input histogram')
+    parser.add_argument('input_histogram', type=str, help='Input histogram')
+    parser.add_argument('--load', type=str, help='Load json')
     parser.add_argument('-k', '--kmer-size', type=int,
                         default=config.DEFAULT_K, help='Kmer size')
     parser.add_argument('-r', '--read-length', type=int,
                         default=config.DEFAULT_READ_LENGTH, help='Read length')
-    parser.add_argument('--plot', action='store_true', help='Plot probabilities')
+    parser.add_argument('--plot', type=bool, nargs='?', const=False,
+                        help='Plot probabilities (use --plot 1 to plot probs * j)')
     parser.add_argument('-rp', '--repeats', action='store_true', help='Estimate with repeats')
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
