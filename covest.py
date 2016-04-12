@@ -124,7 +124,7 @@ class CoverageEstimator:
     GRID_SEARCH_TYPE_PRE = 1
     GRID_SEARCH_TYPE_POST = 2
 
-    def __init__(self, model, err_scale=config.ERR_SCALE, fix=None):
+    def __init__(self, model, err_scale=1, fix=None):
         self.model = model
         self.fix = fix
         self.err_scale = err_scale
@@ -160,13 +160,13 @@ class CoverageEstimator:
         try:
             verbose_print('Bounds: {}'.format(self.bounds))
             if grid_search_type == self.GRID_SEARCH_TYPE_NONE:
-                with running_time('First optimalization'):
+                with running_time('First optimization'):
                     res = self._optimize(r)
                     r = res.x
                     success = res.success
             else:
                 params = initial_grid(r, bounds=self.bounds)
-                with running_time('Initial grid optimalization'):
+                with running_time('Initial grid optimization'):
                     min_r = None
                     with Pool(n_threads) as pool:
                         results = list(pool.map(self._optimize, params))
@@ -364,7 +364,7 @@ def main(args):
     hist_orig, hist = load_hist(
         args.input_histogram, auto_trim=args.autotrim, trim=args.trim
     )
-    err_scale = config.ERR_SCALE
+    err_scale = args.error_scale
 
     # Model selection
     if args.repeats:
@@ -456,6 +456,8 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
+    parser.add_argument('-es', '--error-scale', type=float, default=config.DEFAULT_ERR_SCALE,
+                        help='Error scale')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('-q1', type=float, help='q1')
     parser.add_argument('-mq1', '--min-q1', type=float, default=config.DEFAULT_MIN_SINGLECOPY_RATIO,
