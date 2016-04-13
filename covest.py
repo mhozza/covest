@@ -37,7 +37,7 @@ def get_trim(hist, precision=0):
     return trim
 
 
-def load_hist(fname, auto_trim=None, trim=None):
+def load_hist(fname, tail_sum=False, auto_trim=None, trim=None):
     hist = defaultdict(int)
     max_hist = 0
 
@@ -57,6 +57,8 @@ def load_hist(fname, auto_trim=None, trim=None):
         hist_trimmed = hist_l[:trim]
     elif trim is not None:
         hist_trimmed = hist_l[:trim]
+    if tail_sum:
+        hist_trimmed.append(sum(hist_l[trim:]))
     return hist_l, hist_trimmed
 
 
@@ -395,7 +397,8 @@ def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fi
 @running_time_decorator
 def main(args):
     hist_orig, hist = load_hist(
-        args.input_histogram, auto_trim=args.auto_trim, trim=args.trim
+        args.input_histogram, tail_sum=config.ESTIMATE_TAIL, auto_trim=args.auto_trim,
+        trim=args.trim
     )
     err_scale = args.error_scale
 
