@@ -50,6 +50,16 @@ def tr_poisson(l, j):
             return 0.0
 
 
+def tail_prob(l, j):
+    last_p = 1.0
+    sp = 0
+    for i in range(1, j + 1):
+        p = last_p * (l / i)
+        sp += p
+        last_p = p
+    return 1.0 - exp(-l) * sp
+
+
 class BasicModel:
     def __init__(self, k, r, hist, max_error=None, max_cov=None, *args, **kwargs):
         self.repeats = False
@@ -107,6 +117,9 @@ class BasicModel:
         if not self.check_bounds(args):
             return -config.INF
         p_j = self.compute_probabilities(*args)
+        if config.ESTIMATE_TAIL:
+            sp_j = sum(p_j[1:-1])
+            p_j[-1] = 1 - sp_j
         return float(sum(
             self.hist[j] * safe_log(p_j[j]) for j in range(1, len(self.hist)) if self.hist[j]
         ))
