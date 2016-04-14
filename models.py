@@ -107,6 +107,9 @@ class BasicModel:
         if not self.check_bounds(args):
             return -config.INF
         p_j = self.compute_probabilities(*args)
+        if config.ESTIMATE_TAIL:
+            sp_j = sum(p_j[1:-1])
+            p_j[-1] = 1 - sp_j
         return float(sum(
             self.hist[j] * safe_log(p_j[j]) for j in range(1, len(self.hist)) if self.hist[j]
         ))
