@@ -1,5 +1,6 @@
 import sys
-import config
+
+from covest import config
 
 
 def print_wrap(x, label='', cond=True):

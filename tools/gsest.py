@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 import argparse
-from covest import count_reads_size
+from covest.covest import count_reads_size
 
 
 def main(args):

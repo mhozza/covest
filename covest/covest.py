@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import itertools
 import json
@@ -13,11 +12,11 @@ from os import path
 from numpy.random import binomial
 from scipy.optimize import minimize
 
-import config
-from inverse import inverse
-from models import BasicModel, RepeatsModel
-from perf import running_time, running_time_decorator
-from utils import verbose_print
+from . import config
+from .inverse import inverse
+from .models import BasicModel, RepeatsModel
+from .perf import running_time, running_time_decorator
+from .utils import verbose_print
 
 
 def estimate_p(cc, alpha):
@@ -519,7 +518,8 @@ def main(args):
             )
 
 
-if __name__ == '__main__':
+
+def run():
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
     parser.add_argument('input_histogram', type=str, help='Input histogram')
     parser.add_argument('--load', type=str, help='Load json')
@@ -559,3 +559,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--genome-size', help='Calculate genome size from reads')
 
     main(parser.parse_args())
+
+
+if __name__ == '__main__':
+    run()

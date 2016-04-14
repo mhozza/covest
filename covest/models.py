@@ -4,12 +4,12 @@ import multiprocessing
 from functools import lru_cache
 from math import exp, log
 
+from covest import config
 import matplotlib.pyplot as plt
 import numpy
 from scipy.misc import comb
 
-import config
-from utils import verbose_print
+from covest.utils import verbose_print
 
 
 def fix_zero(x, val=1):
