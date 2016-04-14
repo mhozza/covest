@@ -10,6 +10,7 @@ from math import exp
 from multiprocessing import Pool
 from os import path
 
+from numpy.random import binomial
 from scipy.optimize import minimize
 
 import config
@@ -37,7 +38,29 @@ def get_trim(hist, precision=0):
     return trim
 
 
-def load_hist(fname, tail_sum=False, auto_trim=None, trim=None):
+def sample_hist(hist, factor=2):
+    h = [0 for _ in range(len(hist))]
+    prob = 1.0 / factor
+    max_h = 0
+    for i, v in enumerate(hist):
+        for j in range(v):
+            new_cnt = binomial(i, prob)
+            if new_cnt:
+                h[new_cnt] += 1
+                max_h = max(max_h, new_cnt)
+    return h[:max_h+1]
+
+
+def auto_sample_hist(hist, target_size=50, sample_factor=2):
+    h = list(hist)
+    f = 1
+    while len(h) > target_size:
+        h = sample_hist(h, sample_factor)
+        f *= sample_factor
+    return h, f
+
+
+def load_hist(fname, tail_sum=False, auto_trim=None, trim=None, auto_sample=None, sample_factor=None):
     hist = defaultdict(int)
     max_hist = 0
 
@@ -49,8 +72,14 @@ def load_hist(fname, tail_sum=False, auto_trim=None, trim=None):
             hist[i] = cnt
             max_hist = max(max_hist, i)
 
-    hist_l = [hist[b] for b in range(max_hist)]
-    hist_trimmed = hist_l[:]
+    hist_l = [hist[b] for b in range(max_hist+1)]
+    if sample_factor is None and sample_factor is not None:
+        hist_l = sample_hist(hist_l, sample_factor)
+    if auto_sample is not None:
+        if sample_factor is None:
+            sample_factor = config.DEFAULT_SAMPLE_FACTOR
+        hist_l, sample_factor = auto_sample_hist(hist_l, auto_sample, sample_factor)
+    hist_trimmed = list(hist_l)
     if auto_trim is not None:
         trim = get_trim(hist_l, auto_trim)
         verbose_print('Trimming at: {}'.format(trim))
@@ -60,7 +89,7 @@ def load_hist(fname, tail_sum=False, auto_trim=None, trim=None):
     if tail_sum:
         tail = sum(hist_l[trim:]) if trim is not None else 0
         hist_trimmed.append(tail)
-    return hist_l, hist_trimmed
+    return hist_l, hist_trimmed, sample_factor
 
 
 @lru_cache(maxsize=None)
@@ -127,8 +156,9 @@ class CoverageEstimator:
     GRID_SEARCH_TYPE_PRE = 1
     GRID_SEARCH_TYPE_POST = 2
 
-    def __init__(self, model, err_scale=1, fix=None):
+    def __init__(self, model, sample_factor=1, err_scale=1, fix=None):
         self.model = model
+        self.sample_factor = sample_factor if sample_factor is not None else 1
         self.fix = fix
         self.err_scale = err_scale
         self.bounds = list(self.model.bounds)
@@ -218,7 +248,7 @@ class CoverageEstimator:
 
         if estimated is not None:
             output_data['estimated_loglikelihood'] = self.model.compute_loglikelihood(*estimated)
-            output_data['estimated_coverage'] = estimated[0]
+            output_data['estimated_coverage'] = estimated[0] * self.sample_factor
             output_data['estimated_error_rate'] = estimated[1]
             if repeats:
                 output_data['estimated_q1'] = estimated[2]
@@ -259,6 +289,7 @@ class CoverageEstimator:
 
         output_data['hist_size'] = len(self.model.hist)
         output_data['tail_included'] = config.ESTIMATE_TAIL
+        output_data['sample_factor'] = self.sample_factor
 
         if not silent:
             print(json.dumps(
@@ -398,9 +429,9 @@ def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fi
 
 @running_time_decorator
 def main(args):
-    hist_orig, hist = load_hist(
+    hist_orig, hist, sample_factor = load_hist(
         args.input_histogram, tail_sum=config.ESTIMATE_TAIL, auto_trim=args.auto_trim,
-        trim=args.trim
+        trim=args.trim, auto_sample=args.auto_sample, sample_factor=args.sample_factor,
     )
     err_scale = args.error_scale
 
@@ -461,7 +492,7 @@ def main(args):
             ))
 
             fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
-            estimator = CoverageEstimator(model, err_scale=err_scale, fix=fix)
+            estimator = CoverageEstimator(model, sample_factor=sample_factor, err_scale=err_scale, fix=fix)
             res = estimator.compute_coverage(
                 guess,
                 grid_search_type=args.grid,
@@ -496,10 +527,13 @@ if __name__ == '__main__':
     parser.add_argument('-rp', '--repeats', action='store_true', help='Estimate with repeats')
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
-    parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
+    parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
     parser.add_argument('-at', '--auto-trim', type=int, nargs='?', const=0,
                         help='Trim histogram automatically with this threshold')
+    parser.add_argument('-sf', '--sample-factor', type=int, help='Sample histogram with this factor')
+    parser.add_argument('-as', '--auto-sample', type=int, nargs='?', const=config.DEFAULT_SAMPLE_TARGET,
+                        help='Sample histogram automatically to this target size')
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
