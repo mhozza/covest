@@ -73,12 +73,13 @@ def load_hist(fname, tail_sum=False, auto_trim=None, trim=None, auto_sample=None
             max_hist = max(max_hist, i)
 
     hist_l = [hist[b] for b in range(max_hist+1)]
-    if sample_factor is None and sample_factor is not None:
+    if auto_sample is None and sample_factor is not None:
         hist_l = sample_hist(hist_l, sample_factor)
     if auto_sample is not None:
         if sample_factor is None:
             sample_factor = config.DEFAULT_SAMPLE_FACTOR
         hist_l, sample_factor = auto_sample_hist(hist_l, auto_sample, sample_factor)
+        verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
     hist_trimmed = list(hist_l)
     if auto_trim is not None:
         trim = get_trim(hist_l, auto_trim)
@@ -239,7 +240,7 @@ class CoverageEstimator:
 
         if guess is not None:
             output_data['guessed_loglikelihood'] = self.model.compute_loglikelihood(*guess)
-            output_data['guessed_coverage'] = guess[0]
+            output_data['guessed_coverage'] = guess[0] * self.sample_factor
             output_data['guessed_error_rate'] = guess[1]
             if repeats:
                 output_data['guessed_q1'] = guess[2]
@@ -446,7 +447,11 @@ def main(args):
         min_single_copy_ratio=args.min_q1,
     )
 
-    orig = [args.coverage, args.error_rate, args.q1, args.q2, args.q]
+    cov = args.coverage
+    if sample_factor and cov:
+        cov /= sample_factor
+
+    orig = [cov, args.error_rate, args.q1, args.q2, args.q]
     if not args.repeats:
         orig = orig[:2]
 
