@@ -479,7 +479,7 @@ def main(args):
 
         if args.plot is not None:
             model.plot_probs(
-                res, guess, orig, cumulative=args.plot,
+                res, guess, orig, cumulative=args.plot, log_scale=config.PLOT_LOG_SCALE
             )
 
 

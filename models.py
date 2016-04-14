@@ -137,7 +137,7 @@ class BasicModel:
             tuple(args): likelihood for args, likelihood in zip(args_list, likelihoods)
         }
 
-    def plot_probs(self, est, guess, orig, cumulative=False):
+    def plot_probs(self, est, guess, orig, cumulative=False, log_scale=True):
         def fmt(p):
             return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20]]
 
@@ -156,7 +156,8 @@ class BasicModel:
         else:
             op = adjust_probs([0 for _ in range(len(self.hist))])
 
-        plt.yscale('log')
+        if log_scale:
+            plt.yscale('log')
         plt.plot(
             range(len(hp)), hp, 'ko',
             label='hist',
