@@ -1,3 +1,4 @@
+import ctypes
 import itertools
 import multiprocessing
 from functools import lru_cache
@@ -24,7 +25,7 @@ def safe_log(x):
     return log(x)
 
 
-def tr_poisson(l, j):
+def truncated_poisson(l, j):
     if l == 0:
         return 0.0
     with numpy.errstate(over='raise'):
@@ -48,6 +49,18 @@ def tr_poisson(l, j):
                 )
             )
             return 0.0
+
+try:
+    if config.FAST_POISSON:
+        covest_lib = ctypes.CDLL('./lib/covestlib.so')
+        tr_poisson = covest_lib.truncated_poisson
+        tr_poisson.argtypes = [ctypes.c_longdouble, ctypes.c_int]
+        tr_poisson.restype = ctypes.c_longdouble
+    else:
+        tr_poisson = truncated_poisson
+except (OSError, AttributeError):
+    verbose_print('Failed to load poisson lib!!! Faling back to slow python version.')
+    tr_poisson = truncated_poisson
 
 
 class BasicModel:
