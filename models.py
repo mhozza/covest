@@ -141,14 +141,17 @@ class BasicModel:
         def fmt(p):
             return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20]]
 
-        def adjust_probs(probs):
+        def adjust_probs(probs, hist=False):
+            if not hist and config.ESTIMATE_TAIL:
+                sp = sum(probs[1:-1])
+                probs[-1] = 1 - sp
             if cumulative:
                 return [0 if p is None else i * p for i, p in enumerate(probs)]
             else:
                 return probs
 
         hs = float(sum(self.hist))
-        hp = adjust_probs([f / hs for f in self.hist])
+        hp = adjust_probs([f / hs for f in self.hist], hist=True)
         ep = adjust_probs(self.compute_probabilities(*est))
         gp = adjust_probs(self.compute_probabilities(*guess))
         if orig is not None and None not in orig:
