@@ -142,7 +142,6 @@ class CoverageEstimator:
         return -self.model.compute_loglikelihood(*args)
 
     def _optimize(self, r):
-
         return minimize(
             self.likelihood_f, r,
             method=config.OPTIMIZATION_METHOD,
@@ -209,7 +208,7 @@ class CoverageEstimator:
         output_data['model'] = self.model.__class__.__name__
 
         if guess is not None:
-            output_data['guessed_loglikelihood'] = -self.likelihood_f(guess)
+            output_data['guessed_loglikelihood'] = self.model.compute_loglikelihood(*guess)
             output_data['guessed_coverage'] = guess[0]
             output_data['guessed_error_rate'] = guess[1]
             if repeats:
@@ -218,7 +217,7 @@ class CoverageEstimator:
                 output_data['guessed_q'] = guess[4]
 
         if estimated is not None:
-            output_data['estimated_loglikelihood'] = -self.likelihood_f(estimated)
+            output_data['estimated_loglikelihood'] = self.model.compute_loglikelihood(*estimated)
             output_data['estimated_coverage'] = estimated[0]
             output_data['estimated_error_rate'] = estimated[1]
             if repeats:
@@ -250,15 +249,16 @@ class CoverageEstimator:
 
         if orig_coverage is not None:
             if repeats:
-                output_data['original_loglikelihood'] = -self.likelihood_f(
-                    [orig_coverage, orig_error_rate, orig_q1, orig_q2, orig_q]
+                output_data['original_loglikelihood'] = self.model.compute_loglikelihood(
+                    orig_coverage, orig_error_rate, orig_q1, orig_q2, orig_q
                 )
             else:
-                output_data['original_loglikelihood'] = -self.likelihood_f(
-                    [orig_coverage, orig_error_rate]
+                output_data['original_loglikelihood'] = self.model.compute_loglikelihood(
+                    orig_coverage, orig_error_rate
                 )
 
         output_data['hist_size'] = len(self.model.hist)
+        output_data['tail_included'] = config.ESTIMATE_TAIL
 
         if not silent:
             print(json.dumps(
