@@ -59,7 +59,7 @@ try:
     else:
         tr_poisson = truncated_poisson
 except (OSError, AttributeError):
-    verbose_print('Failed to load poisson lib!!! Faling back to slow python version.')
+    verbose_print('Failed to load covest lib!!! Using slow python version of tr_poisson function.')
     tr_poisson = truncated_poisson
 
 
