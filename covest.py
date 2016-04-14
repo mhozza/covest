@@ -58,7 +58,8 @@ def load_hist(fname, tail_sum=False, auto_trim=None, trim=None):
     elif trim is not None:
         hist_trimmed = hist_l[:trim]
     if tail_sum:
-        hist_trimmed.append(sum(hist_l[trim:]))
+        tail = sum(hist_l[trim:]) if trim is not None else 0
+        hist_trimmed.append(tail)
     return hist_l, hist_trimmed
 
 
@@ -196,6 +197,7 @@ class CoverageEstimator:
                 )
         except KeyboardInterrupt:
             pass
+        verbose_print('Status: %s' % ('success' if success else 'failure',))
         r[1] /= self.err_scale
         return r
 

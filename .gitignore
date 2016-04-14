@@ -11,3 +11,6 @@ bamUtil/
 *.kh.info
 .venv
 .idea/
+lib/*.so
+output/
+
