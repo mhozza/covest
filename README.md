@@ -1,4 +1,4 @@
-# coverage-estimator
+# covest
 Tool that estimates coverage (and genome size) of dna sequence from reads.
 
 ```
