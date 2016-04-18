@@ -1,15 +1,12 @@
-import ctypes
 import itertools
 import multiprocessing
 from functools import lru_cache
 from math import exp, log
 
 from covest import config
+from covest_poisson import truncated_poisson as tr_poisson
 import matplotlib.pyplot as plt
-import numpy
 from scipy.misc import comb
-
-from covest.utils import verbose_print
 
 
 def fix_zero(x, val=1):
@@ -23,44 +20,6 @@ def safe_log(x):
     if x is None or x <= 0:
         return -config.INF
     return log(x)
-
-
-def truncated_poisson(l, j):
-    if l == 0:
-        return 0.0
-    with numpy.errstate(over='raise'):
-        try:
-            p1 = 1.0
-            for i in range(1, j + 1):
-                p1 *= l / i
-            while l > config.MAX_EXP and p1 > 0:
-                p1 /= exp(config.MAX_EXP)
-                l -= config.MAX_EXP
-            if l > 1e-8 and p1 > 0:
-                p3 = exp(l) - 1.0
-            else:
-                p3 = l
-            res = p1 / p3
-            return res
-        except (OverflowError, FloatingPointError) as e:
-            verbose_print(
-                'Precision error at l:{}, j:{}\n Consider histogram trimming\n{}'.format(
-                    l, j, e
-                )
-            )
-            return 0.0
-
-try:
-    if config.FAST_POISSON:
-        covest_lib = ctypes.CDLL('libcovest.so')
-        tr_poisson = covest_lib.truncated_poisson
-        tr_poisson.argtypes = [ctypes.c_longdouble, ctypes.c_int]
-        tr_poisson.restype = ctypes.c_longdouble
-    else:
-        tr_poisson = truncated_poisson
-except (OSError, AttributeError):
-    verbose_print('Failed to load covest lib!!! Using slow python version of tr_poisson function.')
-    tr_poisson = truncated_poisson
 
 
 class BasicModel:

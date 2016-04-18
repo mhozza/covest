@@ -1,13 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-
 try:
-    from setuptools import setup
+    from setuptools.core import setup, Extension
 except ImportError:
-    from distutils.core import setup
-
-import shlib
+    from distutils.core import setup, Extension
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -27,11 +23,10 @@ test_requirements = [
     # TODO: put package test requirements here
 ]
 
-covestlib = shlib.build_shlib.SharedLibrary(
-    'covest',
+covest_poisson = Extension(
+    'covest_poisson',
     libraries=['m'],
-    sources=['c_src/covest_lib.c'],
-    extra_compile_args=['-O3', '-g', '-Wall', '-shared', '-fPIC']
+    sources=['c_src/covest_poissonmodule.c'],
 )
 
 setup(
@@ -46,13 +41,14 @@ setup(
     packages=[
         'covest',
     ],
-    package_dir={'covest':
-                 'covest'},
+    package_dir={
+        'covest': 'covest'
+    },
     include_package_data=True,
     package_data={
         'covest': ['templates/*.tpl'],
     },
-    shlibs=[covestlib],
+    ext_modules=[covest_poisson],
     install_requires=requirements,
     entry_points={
         'console_scripts': ['covest=covest.covest:run'],
