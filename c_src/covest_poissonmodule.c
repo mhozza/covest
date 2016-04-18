@@ -35,9 +35,37 @@ static PyObject *truncated_poisson( PyObject *self, PyObject *args )
 }
 
 
+static PyObject *poisson( PyObject *self, PyObject *args )
+{
+    double l;
+    int j;
+    if (!PyArg_ParseTuple(args, "di:poisson", &l, &j)) {
+        return NULL;
+    }
+
+    if (l == 0 || l != l) {
+        return Py_BuildValue("d", 0);
+    }
+
+    long double p1 = 1;
+
+    for (int i = 1; i<=j; i++) {
+        p1 *= l / i;
+    }
+    while (l > MAX_EXP && p1 > 0) {
+        p1 /= expl(MAX_EXP);
+        l -= MAX_EXP;
+    }
+    double res = (double)(p1/expl(l));
+    return Py_BuildValue("d", res);
+}
+
+
 static PyMethodDef PoissonMethods[] = {
     {"truncated_poisson",  truncated_poisson, METH_VARARGS,
      "Compute truncated poisson pmf value."},
+    {"poisson",  poisson, METH_VARARGS,
+     "Compute poisson pmf value."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
