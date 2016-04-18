@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import json
+import math
 import pickle
 import random
 from collections import defaultdict, namedtuple
@@ -9,7 +10,8 @@ from math import exp
 from multiprocessing import Pool
 from os import path
 
-from numpy.random import binomial
+from covest_poisson import poisson
+from scipy.stats import binom
 from scipy.optimize import minimize
 
 from . import config
@@ -38,15 +40,30 @@ def get_trim(hist, precision=0):
 
 
 def sample_hist(hist, factor=2):
-    h = [0 for _ in range(len(hist))]
+    trim = get_trim(hist, 5)
+    h = [0 for _ in range(trim)]
     prob = 1.0 / factor
     max_h = 0
     for i, v in enumerate(hist):
-        for j in range(v):
-            new_cnt = binomial(i, prob)
-            if new_cnt:
-                h[new_cnt] += 1
-                max_h = max(max_h, new_cnt)
+        if i >= trim:
+            break
+        if i < 100:
+            b = binom(i, prob)
+            probs = [b.pmf(j) for j in range(1, i+1)]
+        else:
+            probs = [poisson(i*prob, j) for j in range(1, i + 1)]
+
+        for j, p in enumerate(probs):
+            h[j+1] += v*p
+
+    for i, v in enumerate(h):
+        d = v - round(v)
+        if random.random() < d:
+            h[i] = math.ceil(v)
+        else:
+            h[i] = math.floor(v)
+        if h[i]:
+            max_h = i
     return h[:max_h+1]
 
 
