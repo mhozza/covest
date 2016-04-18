@@ -40,7 +40,10 @@ def get_trim(hist, precision=0):
 
 
 def sample_hist(hist, factor=2):
-    trim = get_trim(hist, 5)
+    if len(hist) > 200:
+        trim = get_trim(hist, 5)
+    else:
+        trim = len(hist)
     h = [0 for _ in range(trim)]
     prob = 1.0 / factor
     max_h = 0
