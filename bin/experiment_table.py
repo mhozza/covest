@@ -1,8 +1,9 @@
 #! /usr/bin/env python
 import argparse
 from collections import defaultdict
-from table_generator import format_table
-from experiment_parser import parse_all
+from covest.tools.table_generator import format_table
+from covest.tools.experiment_parser import parse_all
+from covest.tools import templates
 
 SEPARATE_EF = True
 
@@ -85,9 +86,9 @@ def main(args):
     # ]
 
     format_templates = {
-        'html': 'templates/html.tpl',
-        'csv': 'templates/csv.tpl',
-        'tex': 'templates/tex.tpl',
+        'html': templates.html,
+        'csv': templates.csv,
+        'tex': templates.tex,
     }
 
     format_escape = {

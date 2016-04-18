@@ -49,11 +49,22 @@ setup(
     package_dir={'covest':
                  'covest'},
     include_package_data=True,
+    package_data={
+        'covest': ['templates/*.tpl'],
+    },
     shlibs=[covestlib],
     install_requires=requirements,
     entry_points={
         'console_scripts': ['covest=covest.covest:run'],
     },
+    scripts=[
+        'bin/gsest.py',
+        'bin/generate_sequence.py',
+        'bin/read_simulator.py',
+        'bin/prepare_experiment.py',
+        'bin/sam_to_fasta.py',
+        'bin/experiment_table.py',
+    ],
     license='ISCL',
     zip_safe=False,
     keywords='covest',
