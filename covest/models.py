@@ -52,7 +52,7 @@ def truncated_poisson(l, j):
 
 try:
     if config.FAST_POISSON:
-        covest_lib = ctypes.CDLL('./lib/covestlib.so')
+        covest_lib = ctypes.CDLL('libcovest.so')
         tr_poisson = covest_lib.truncated_poisson
         tr_poisson.argtypes = [ctypes.c_longdouble, ctypes.c_int]
         tr_poisson.restype = ctypes.c_longdouble
