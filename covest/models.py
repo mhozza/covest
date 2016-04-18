@@ -4,12 +4,12 @@ import multiprocessing
 from functools import lru_cache
 from math import exp, log
 
+from covest import config
 import matplotlib.pyplot as plt
 import numpy
 from scipy.misc import comb
 
-import config
-from utils import verbose_print
+from covest.utils import verbose_print
 
 
 def fix_zero(x, val=1):
@@ -52,7 +52,7 @@ def truncated_poisson(l, j):
 
 try:
     if config.FAST_POISSON:
-        covest_lib = ctypes.CDLL('./lib/covestlib.so')
+        covest_lib = ctypes.CDLL('libcovest.so')
         tr_poisson = covest_lib.truncated_poisson
         tr_poisson.argtypes = [ctypes.c_longdouble, ctypes.c_int]
         tr_poisson.restype = ctypes.c_longdouble
