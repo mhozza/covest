@@ -5,11 +5,8 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 
-with open('README.rst') as readme_file:
+with open('README.md') as readme_file:
     readme = readme_file.read()
-
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
 
 requirements = [
     'biopython',
@@ -34,7 +31,7 @@ setup(
     version='0.1.0',
     description="Covest estimates the coverage and genom size, "
     "just from k-mer abundance histogram computed from DNA sequences reads.",
-    long_description=readme + '\n\n' + history,
+    long_description=readme,
     author="Michal Hozza",
     author_email='mhozza@gmail.com',
     url='https://github.com/mhozza/covest',
