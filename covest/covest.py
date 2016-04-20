@@ -1,18 +1,17 @@
 import argparse
 import json
-from collections import namedtuple
 from math import exp
 from multiprocessing import Pool
 
 from scipy.optimize import minimize
 
 from . import config
-from .data import load_hist, count_reads_size
 from .grid import initial_grid, optimize_grid
 from .inverse import inverse
+from .io import count_reads_size, load_hist, parse_data, print_output
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
-from .utils import verbose_print, safe_int
+from .utils import verbose_print
 
 
 def estimate_p(cc, alpha):
@@ -65,9 +64,8 @@ class CoverageEstimator:
     GRID_SEARCH_TYPE_PRE = 1
     GRID_SEARCH_TYPE_POST = 2
 
-    def __init__(self, model, sample_factor=1, err_scale=1, fix=None):
+    def __init__(self, model, err_scale=1, fix=None):
         self.model = model
-        self.sample_factor = sample_factor if sample_factor is not None else 1
         self.fix = fix
         self.err_scale = err_scale
         self.bounds = list(self.model.bounds)
@@ -96,7 +94,6 @@ class CoverageEstimator:
     ):
         r = list(guess)
         r[1] *= self.err_scale
-
         success = True
         try:
             verbose_print('Bounds: {}'.format(self.bounds))
@@ -138,96 +135,6 @@ class CoverageEstimator:
         verbose_print('Status: %s' % ('success' if success else 'failure',))
         r[1] /= self.err_scale
         return r
-
-    def print_output(self, estimated=None, guess=None,
-                     orig_coverage=None, orig_error_rate=None,
-                     orig_q1=None, orig_q2=None, orig_q=None,
-                     repeats=False, silent=False, reads_size=None):
-        output_data = dict()
-        output_data['model'] = self.model.__class__.__name__
-
-        if guess is not None:
-            output_data['guessed_loglikelihood'] = self.model.compute_loglikelihood(*guess)
-            output_data['guessed_coverage'] = guess[0] * self.sample_factor
-            output_data['guessed_error_rate'] = guess[1]
-            if repeats:
-                output_data['guessed_q1'] = guess[2]
-                output_data['guessed_q2'] = guess[3]
-                output_data['guessed_q'] = guess[4]
-
-        if estimated is not None:
-            output_data['estimated_loglikelihood'] = self.model.compute_loglikelihood(*estimated)
-            output_data['estimated_coverage'] = estimated[0] * self.sample_factor
-            output_data['estimated_error_rate'] = estimated[1]
-            if repeats:
-                output_data['estimated_q1'] = estimated[2]
-                output_data['estimated_q2'] = estimated[3]
-                output_data['estimated_q'] = estimated[4]
-                if orig_q1 is None:
-                    orig_q1 = estimated[2]
-                if orig_q2 is None:
-                    orig_q2 = estimated[3]
-                if orig_q is None:
-                    orig_q = estimated[4]
-
-            output_data['estimated_genome_size'] = safe_int(round(
-                sum(
-                    i * h for i, h in enumerate(self.model.hist)
-                ) / self.model.correct_c(estimated[0])
-            ))
-
-            if reads_size is not None:
-                output_data['estimated_genome_size_r'] = safe_int(
-                    round(reads_size / estimated[0])
-                )
-
-        if orig_error_rate is not None:
-            output_data['original_error_rate'] = orig_error_rate
-        elif estimated is not None:
-            orig_error_rate = estimated[1]
-
-        if orig_coverage is not None:
-            if repeats:
-                output_data['original_loglikelihood'] = self.model.compute_loglikelihood(
-                    orig_coverage, orig_error_rate, orig_q1, orig_q2, orig_q
-                )
-            else:
-                output_data['original_loglikelihood'] = self.model.compute_loglikelihood(
-                    orig_coverage, orig_error_rate
-                )
-
-        output_data['hist_size'] = len(self.model.hist)
-        output_data['tail_included'] = config.ESTIMATE_TAIL
-        output_data['sample_factor'] = self.sample_factor
-
-        if not silent:
-            print(json.dumps(
-                output_data, sort_keys=True, indent=4, separators=(',', ': ')
-            ))
-
-        return output_data
-
-
-def parse_data(data):
-    model_class_name = data['model']
-
-    guess = list()
-    guess.append(data.get('guessed_coverage', None))
-    guess.append(data.get('guessed_error_rate', None))
-    if model_class_name == 'RepeatsModel':
-        guess.append(data.get('guessed_q1', None))
-        guess.append(data.get('guessed_q2', None))
-        guess.append(data.get('guessed_q', None))
-
-    estimated = list()
-    estimated.append(data.get('estimated_coverage', None))
-    estimated.append(data.get('estimated_error_rate', None))
-    if model_class_name == 'RepeatsModel':
-        estimated.append(data.get('estimated_q1', None))
-        estimated.append(data.get('estimated_q2', None))
-        estimated.append(data.get('estimated_q', None))
-
-    return namedtuple('ParsedData', ('estimated', 'guess'))(estimated=estimated, guess=guess)
 
 
 @running_time_decorator
@@ -289,17 +196,16 @@ def main(args):
                 guess, model.compute_loglikelihood(*guess)
             ))
             # Estimate coverage
-            estimator = CoverageEstimator(
-                model, sample_factor=sample_factor, err_scale=err_scale, fix=fix
-            )
+            estimator = CoverageEstimator(model, err_scale=err_scale, fix=fix)
             res = estimator.compute_coverage(
                 guess,
                 grid_search_type=args.grid,
                 n_threads=args.thread_count,
             )
-            estimator.print_output(
+            print_output(
+                model,
                 res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
-                repeats=args.repeats, reads_size=reads_size,
+                sample_factor=sample_factor, repeats=args.repeats, reads_size=reads_size,
             )
 
         if args.plot is not None:

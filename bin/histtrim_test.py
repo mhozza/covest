@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 
-from covest.data import load_hist
+from covest.io import load_hist
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')

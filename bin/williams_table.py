@@ -3,7 +3,7 @@ import argparse
 from collections import defaultdict
 from covest.tools.table_generator import format_table
 from covest.tools.experiment_parser import parse_all
-from covest.data import count_reads_size
+from covest.io import count_reads_size
 
 SEPARATE_EF = True
 
