@@ -2,6 +2,7 @@
 Tool that estimates coverage (and genome size) of dna sequence from reads.
 
 ## Installation
+`pip install covest`
 
 ### For development:
 `pip install -e .` from the project directory
