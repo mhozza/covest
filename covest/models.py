@@ -17,12 +17,23 @@ class BasicModel:
         self.k = k
         self.r = r
         self.bounds = ((0.01, max_cov), (0.0, 0.5))
+        self.defaults = (1, self._default_param(1))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
         self.hist = hist
         if max_error is None:
             self.max_error = self.k + 1
         else:
             self.max_error = min(self.k + 1, max_error)
+
+    @property
+    def param_count(self):
+        return len(self.bounds)
+
+    def _default_param(self, i, default=None):
+        l, r = self.bounds[i]
+        if l is None or r is None:
+            return default
+        return (l + r) / 2
 
     def check_bounds(self, args):
         for arg, (l, r) in zip(args, self.bounds):
@@ -143,6 +154,7 @@ class RepeatsModel(BasicModel):
         self.repeats = True
         self.bounds = (
             (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 0.9999), (0.0, 0.99), (0.0, 0.99))
+        self.defaults = self.defaults + (self._default_param(i, default=0.5) for i in range(2, 5))
         self.threshold = threshold
 
     def get_hist_threshold(self, b_o, threshold):

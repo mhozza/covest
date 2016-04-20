@@ -6,6 +6,7 @@ from scipy.stats import binom
 from functools import lru_cache
 from os import path
 
+from . import config
 from .utils import verbose_print
 
 
@@ -30,7 +31,7 @@ def sample_hist(hist, factor=2, trim=None):
         else:
             trim = len(hist)
     else:
-        trim = min(len(hist), trim*factor)
+        trim = min(len(hist), trim * factor)
 
     h = [0 for _ in range(trim)]
     prob = 1.0 / factor
@@ -40,12 +41,12 @@ def sample_hist(hist, factor=2, trim=None):
             break
         if i < 100:
             b = binom(i, prob)
-            probs = [b.pmf(j) for j in range(1, i+1)]
+            probs = [b.pmf(j) for j in range(1, i + 1)]
         else:
-            probs = [poisson(i*prob, j) for j in range(1, i + 1)]
+            probs = [poisson(i * prob, j) for j in range(1, i + 1)]
 
         for j, p in enumerate(probs):
-            h[j+1] += v*p
+            h[j + 1] += v * p
 
     for i, v in enumerate(h):
         d = v - round(v)
@@ -55,7 +56,7 @@ def sample_hist(hist, factor=2, trim=None):
             h[i] = math.floor(v)
         if h[i]:
             max_h = i
-    return h[:max_h+1]
+    return h[:max_h + 1]
 
 
 def auto_sample_hist(hist, target_size=50, sample_factor=2):
@@ -67,7 +68,8 @@ def auto_sample_hist(hist, target_size=50, sample_factor=2):
     return h, f
 
 
-def load_hist(fname, tail_sum=False, auto_trim=None, trim=None, auto_sample=None, sample_factor=None):
+def load_hist(fname, tail_sum=False, auto_trim=None, trim=None, auto_sample=None,
+              sample_factor=None):
     hist = defaultdict(int)
     max_hist = 0
 
@@ -79,7 +81,7 @@ def load_hist(fname, tail_sum=False, auto_trim=None, trim=None, auto_sample=None
             hist[i] = cnt
             max_hist = max(max_hist, i)
 
-    hist_l = [hist[b] for b in range(max_hist+1)]
+    hist_l = [hist[b] for b in range(max_hist + 1)]
     if auto_sample is None and sample_factor is not None:
         hist_l = sample_hist(hist_l, sample_factor, trim)
     if auto_sample is not None:

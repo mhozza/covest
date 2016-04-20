@@ -232,30 +232,32 @@ def parse_data(data):
 
 @running_time_decorator
 def main(args):
+    # Load histogram
     hist_orig, hist, sample_factor = load_hist(
         args.input_histogram, tail_sum=config.ESTIMATE_TAIL, auto_trim=args.auto_trim,
         trim=args.trim, auto_sample=args.auto_sample, sample_factor=args.sample_factor,
     )
+    reads_size = None
+    if args.read_file is not None:
+        reads_size = count_reads_size(args.read_file)
     err_scale = args.error_scale
+    if sample_factor and args.coverage:
+        args.coverage /= sample_factor
 
     # Model selection
     if args.repeats:
         model_class = RepeatsModel
     else:
         model_class = BasicModel
+    # Model initialisation
     model = model_class(
         args.kmer_size, args.read_length, hist,
         max_error=8, max_cov=args.max_coverage,
         min_single_copy_ratio=args.min_q1,
     )
 
-    cov = args.coverage
-    if sample_factor and cov:
-        cov /= sample_factor
-
-    orig = [cov, args.error_rate, args.q1, args.q2, args.q]
-    if not args.repeats:
-        orig = orig[:2]
+    orig = (args.coverage, args.error_rate, args.q1, args.q2, args.q)[:model.param_count]
+    fix = orig if args.fix else None
 
     if args.ll_only:
         ll = model.compute_loglikelihood(*orig)
@@ -263,42 +265,30 @@ def main(args):
     else:
         if args.load:
             with open(args.load) as f:
-                data = json.load(f)
-                parsed_data = parse_data(data)
+                parsed_data = parse_data(json.load(f))
                 guess = parsed_data.guess
                 res = parsed_data.estimated
         else:
             verbose_print('Estimating coverage for {}'.format(args.input_histogram))
             if args.start_original:
-                if args.repeats:
-                    cov, e, q1, q2, q = orig
-                else:
-                    cov, e = orig
+                params = list(orig)
             else:
                 # Compute initial guess
+                params = list(model.defaults)
                 cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
-                if cov == 0 and e == 1:
-                    # We were unable to guess cov and e.
-                    # Try to estimate from some fixed valid data instead.
-                    cov, e = 1, 0.5
-                if args.fix:
-                    if args.coverage is not None:
-                        cov = args.coverage
-                    if args.error_rate is not None:
-                        e = args.error_rate
-                q1, q2, q = [0.5 if i is None else i for i in [args.q1, args.q2, args.q]]
+                if not (cov == 0 and e == 1):  # We were able to guess cov and e
+                    params[:2] = cov, e
+                if fix:
+                    for i, v in fix:
+                        if v is not None:
+                            params[i] = v
 
             # Initial guess
-            if args.repeats:
-                guess = [cov, e, q1, q2, q]
-            else:
-                guess = [cov, e]
-
+            guess = tuple(params)
             verbose_print('Initial guess: {} ll:{}'.format(
                 guess, model.compute_loglikelihood(*guess)
             ))
-
-            fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
+            # Estimate coverage
             estimator = CoverageEstimator(
                 model, sample_factor=sample_factor, err_scale=err_scale, fix=fix
             )
@@ -307,11 +297,6 @@ def main(args):
                 grid_search_type=args.grid,
                 n_threads=args.thread_count,
             )
-            reads_size = None
-            if args.genome_size is not None:
-                # genome_size contains read file name
-                reads_size = count_reads_size(args.genome_size)
-
             estimator.print_output(
                 res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
                 repeats=args.repeats, reads_size=reads_size,
@@ -362,7 +347,8 @@ def run():
                         help='Fix some vars, optimize others')
     parser.add_argument('-T', '--thread-count', default=config.DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
-    parser.add_argument('-s', '--genome-size', help='Calculate genome size from reads')
+    parser.add_argument('-s', '--genome-size', dest='read_file',
+                        help='Calculate genome size from reads')
 
     main(parser.parse_args())
 
