@@ -170,31 +170,29 @@ def main(args):
         ll = model.compute_loglikelihood(*orig)
         print('Loglikelihood:', ll)
     else:
-        if args.load:
+        if args.load:  # Load saved data, don't estimate anything
             with open(args.load) as f:
                 parsed_data = parse_data(json.load(f))
                 guess = parsed_data.guess
                 res = parsed_data.estimated
         else:
             verbose_print('Estimating coverage for {}'.format(args.input_histogram))
+            # Compute initial guess
             if args.start_original:
-                params = list(orig)
+                guess = list(orig)
             else:
-                # Compute initial guess
-                params = list(model.defaults)
+                guess = list(model.defaults)
                 cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
                 if not (cov == 0 and e == 1):  # We were able to guess cov and e
-                    params[:2] = cov, e
+                    guess[:2] = cov, e
                 if fix:
                     for i, v in fix:
                         if v is not None:
-                            params[i] = v
-
-            # Initial guess
-            guess = tuple(params)
+                            guess[i] = v
             verbose_print('Initial guess: {} ll:{}'.format(
                 guess, model.compute_loglikelihood(*guess)
             ))
+
             # Estimate coverage
             estimator = CoverageEstimator(model, err_scale=err_scale, fix=fix)
             res = estimator.compute_coverage(
@@ -202,12 +200,14 @@ def main(args):
                 grid_search_type=args.grid,
                 n_threads=args.thread_count,
             )
+
             print_output(
                 model,
                 res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
                 sample_factor=sample_factor, repeats=args.repeats, reads_size=reads_size,
             )
 
+        # Draw plot
         if args.plot is not None:
             model.plot_probs(
                 res, guess, orig, cumulative=args.plot, log_scale=config.PLOT_LOG_SCALE
