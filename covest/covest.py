@@ -1,15 +1,14 @@
 import argparse
 import json
 from collections import namedtuple
-
 from math import exp
 from multiprocessing import Pool
 
 from scipy.optimize import minimize
 
 from . import config
-from .grid import initial_grid, optimize_grid
 from .data import load_hist, count_reads_size
+from .grid import initial_grid, optimize_grid
 from .inverse import inverse
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
@@ -300,7 +299,9 @@ def main(args):
             ))
 
             fix = [args.coverage, args.error_rate, args.q1, args.q2, args.q] if args.fix else None
-            estimator = CoverageEstimator(model, sample_factor=sample_factor, err_scale=err_scale, fix=fix)
+            estimator = CoverageEstimator(
+                model, sample_factor=sample_factor, err_scale=err_scale, fix=fix
+            )
             res = estimator.compute_coverage(
                 guess,
                 grid_search_type=args.grid,
@@ -339,8 +340,10 @@ def run():
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
     parser.add_argument('-at', '--auto-trim', type=int, nargs='?', const=0,
                         help='Trim histogram automatically with this threshold')
-    parser.add_argument('-sf', '--sample-factor', type=int, help='Sample histogram with this factor')
-    parser.add_argument('-as', '--auto-sample', type=int, nargs='?', const=config.DEFAULT_SAMPLE_TARGET,
+    parser.add_argument('-sf', '--sample-factor', type=int,
+                        help='Sample histogram with this factor')
+    parser.add_argument('-as', '--auto-sample', type=int, nargs='?',
+                        const=config.DEFAULT_SAMPLE_TARGET,
                         help='Sample histogram automatically to this target size')
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
