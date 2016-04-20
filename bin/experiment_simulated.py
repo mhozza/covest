@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 import os
 import subprocess
-from copy import deepcopy
 
 generator = './generate_sequence.py {seq_name}.fa'
 simulator = './read_simulator.py {seq_name}.fa {infile_base}.fa'\

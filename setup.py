@@ -14,6 +14,8 @@ requirements = [
     'numpy',
     'pystache',
     'scipy<0.16',
+    'pyfasta',
+    'pysam',
 ]
 
 test_requirements = [

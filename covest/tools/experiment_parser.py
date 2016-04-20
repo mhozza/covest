@@ -1,10 +1,9 @@
 #! /usr/bin/env python
-import sys
 import glob
-import os
 import json
+import os
+import sys
 from collections import defaultdict
-from .table_generator import format_table
 
 SEPARATE_EF = True
 
@@ -158,10 +157,10 @@ def compute_average(table_lines, std_key_suffix='_std'):
     return table_avg
 
 
-def parse_all(path, filter, err=False, legacy=False):
+def parse_all(path, file_filter, err=False, legacy=False):
     # path = args.path
     # files = sorted(glob.glob(os.path.join(path, args.filter)))
-    files = sorted(glob.glob(os.path.join(path, filter)))
+    files = sorted(glob.glob(os.path.join(path, file_filter)))
     # err = not args.no_error
 
     table_lines = defaultdict(dict)

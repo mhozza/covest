@@ -1,129 +1,23 @@
 import argparse
-import itertools
 import json
-import math
-import pickle
-import random
-from collections import defaultdict, namedtuple
-from functools import lru_cache
+from collections import namedtuple
+
 from math import exp
 from multiprocessing import Pool
-from os import path
 
-from covest_poisson import poisson
-from scipy.stats import binom
 from scipy.optimize import minimize
 
 from . import config
+from .grid import initial_grid, optimize_grid
+from .data import load_hist, count_reads_size
 from .inverse import inverse
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
-from .utils import verbose_print
+from .utils import verbose_print, safe_int
 
 
 def estimate_p(cc, alpha):
     return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
-
-
-def get_trim(hist, precision=0):
-    ss = float(sum(hist))
-    s = 0.0
-    trim = None
-    for i, h in enumerate(hist):
-        s += h
-        r = s / ss
-        if precision:
-            r = round(r, precision)
-        if r == 1 and trim is None:
-            trim = i
-    return trim
-
-
-def sample_hist(hist, factor=2):
-    if len(hist) > 200:
-        trim = get_trim(hist, 5)
-    else:
-        trim = len(hist)
-    h = [0 for _ in range(trim)]
-    prob = 1.0 / factor
-    max_h = 0
-    for i, v in enumerate(hist):
-        if i >= trim:
-            break
-        if i < 100:
-            b = binom(i, prob)
-            probs = [b.pmf(j) for j in range(1, i+1)]
-        else:
-            probs = [poisson(i*prob, j) for j in range(1, i + 1)]
-
-        for j, p in enumerate(probs):
-            h[j+1] += v*p
-
-    for i, v in enumerate(h):
-        d = v - round(v)
-        if random.random() < d:
-            h[i] = math.ceil(v)
-        else:
-            h[i] = math.floor(v)
-        if h[i]:
-            max_h = i
-    return h[:max_h+1]
-
-
-def auto_sample_hist(hist, target_size=50, sample_factor=2):
-    h = list(hist)
-    f = 1
-    while len(h) > target_size:
-        h = sample_hist(h, sample_factor)
-        f *= sample_factor
-    return h, f
-
-
-def load_hist(fname, tail_sum=False, auto_trim=None, trim=None, auto_sample=None, sample_factor=None):
-    hist = defaultdict(int)
-    max_hist = 0
-
-    with open(fname, 'r') as f:
-        for line in f:
-            l = line.split()
-            i = int(l[0])
-            cnt = int(l[1])
-            hist[i] = cnt
-            max_hist = max(max_hist, i)
-
-    hist_l = [hist[b] for b in range(max_hist+1)]
-    if auto_sample is None and sample_factor is not None:
-        hist_l = sample_hist(hist_l, sample_factor)
-    if auto_sample is not None:
-        if sample_factor is None:
-            sample_factor = config.DEFAULT_SAMPLE_FACTOR
-        hist_l, sample_factor = auto_sample_hist(hist_l, auto_sample, sample_factor)
-        verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
-    hist_trimmed = list(hist_l)
-    if auto_trim is not None:
-        trim = get_trim(hist_l, auto_trim)
-        verbose_print('Trimming at: {}'.format(trim))
-        hist_trimmed = hist_l[:trim]
-    elif trim is not None:
-        hist_trimmed = hist_l[:trim]
-    if tail_sum:
-        tail = sum(hist_l[trim:]) if trim is not None else 0
-        hist_trimmed.append(tail)
-    return hist_l, hist_trimmed, sample_factor
-
-
-@lru_cache(maxsize=None)
-def count_reads_size(fname):
-    from Bio import SeqIO
-    _, ext = path.splitext(fname)
-    fmt = 'fasta'
-    if ext == '.fq' or ext == '.fastq':
-        fmt = 'fastq'
-    try:
-        with open(fname, "rU") as f:
-            return sum(len(read) for read in SeqIO.parse(f, fmt))
-    except FileNotFoundError as e:
-        verbose_print(e)
 
 
 def compute_coverage_apx(hist, k, r):
@@ -165,10 +59,6 @@ def compute_coverage_apx(hist, k, r):
             return 0.0, float(e)
     except ZeroDivisionError:
         return 0.0, 1.0
-
-
-def safe_int(x):
-    return int(x) if x != float('inf') else None
 
 
 class CoverageEstimator:
@@ -341,112 +231,6 @@ def parse_data(data):
     return namedtuple('ParsedData', ('estimated', 'guess'))(estimated=estimated, guess=guess)
 
 
-def unpack_call(args):
-    f, data = args
-    f = pickle.loads(f)
-    return f(data)
-
-
-@running_time_decorator
-def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
-                  n_threads=config.DEFAULT_THREAD_COUNT):
-    def generate_grid(args, step, max_depth):
-        def generate_grid_single(var, fix=None):
-            if fix is None:
-                return (
-                    var * step ** d
-                    for d in range(-max_depth, max_depth + 1) if d != 0
-                )
-            else:
-                return [fix]
-
-        def filter_bounds(var_grid, i):
-            if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
-                return var_grid
-            low, high = bounds[i]
-            return (
-                var for var in var_grid
-                if (low is None or var >= low) and (high is None or var <= high)
-            )
-
-        var_grids = [
-            list(filter_bounds(generate_grid_single(var, fix[i]), i))
-            for i, var in enumerate(args)
-        ]
-        return itertools.product(*var_grids)
-
-    if fix is None:
-        fix = [None] * len(initial_guess)
-    sgn = -1 if maximize else 1
-    f = pickle.dumps(fn, pickle.HIGHEST_PROTOCOL)
-    min_val = sgn * unpack_call([f, initial_guess])
-    min_args = initial_guess
-    step = config.STEP
-    grid_depth = config.GRID_DEPTH
-    diff = 1
-    n_iter = 0
-    try:
-        while diff > 0.1 or step > 1.001:
-            n_iter += 1
-            diff = 0.0
-            grid = list(generate_grid(min_args, step, grid_depth))
-            verbose_print('Iter : {}, Grid size: {}'.format(n_iter, len(grid)))
-            fn_grid = zip([f] * len(grid), grid)
-            with running_time('grid iteration'):
-                with Pool(n_threads) as pool:
-                    res = pool.map(unpack_call, fn_grid)
-            for args, val in zip(grid, res):
-                # val = fn(args)
-                if sgn * val < min_val:
-                    diff += min_val - val
-                    min_val = sgn * val
-                    min_args = args
-            if diff < 1.0:
-                step = 1 + (step - 1) * 0.75
-            verbose_print('d:{} s:{}'.format(diff, step))
-            verbose_print('New args: {}, ll: {}'.format(min_args, min_val))
-    except KeyboardInterrupt:
-        verbose_print('Grid search interrupted')
-
-    verbose_print('Number of iterations in grid search:{}'.format(n_iter))
-    return min_args
-
-
-def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fix=None, ):
-    def generate_grid(step):
-        def apply_bounds(interval, i):
-            if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
-                return interval
-            lb, rb = bounds[i]
-            li, ri = interval
-            if lb is not None:
-                li = max(li, lb)
-            if rb is not None:
-                ri = min(ri, rb)
-            return li, ri
-
-        def generate_random_params():
-            bounds = [
-                apply_bounds((var / step, var * step), i) for i, var in enumerate(initial_guess)
-            ]
-            return [
-                random.uniform(*interval) if fix is None or fix[i] is None else fix[i]
-                for i, interval in enumerate(bounds)
-            ]
-
-        if count < 1:
-            grid = []
-        else:
-            grid = [initial_guess]
-            for _ in range(count - 1):
-                grid.append(generate_random_params())
-        return grid
-
-    if fix is None:
-        fix = [None] * len(initial_guess)
-    return list(generate_grid(config.INITIAL_GRID_STEP))
-
-
 @running_time_decorator
 def main(args):
     hist_orig, hist, sample_factor = load_hist(
@@ -536,7 +320,6 @@ def main(args):
             model.plot_probs(
                 res, guess, orig, cumulative=args.plot, log_scale=config.PLOT_LOG_SCALE
             )
-
 
 
 def run():

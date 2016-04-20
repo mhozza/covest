@@ -1,9 +1,9 @@
 #! /usr/bin/env python
 import argparse
 from collections import defaultdict
-from table_generator import format_table
-from experiment_parser import parse_all
-from covest import count_reads_size
+from covest.tools.table_generator import format_table
+from covest.tools.experiment_parser import parse_all
+from covest.data import count_reads_size
 
 SEPARATE_EF = True
 

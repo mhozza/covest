@@ -33,7 +33,7 @@ def inverse(f, delta=1e-8):
         derifunc = derivative(rootfunc)
         d = (rootfunc(guess) / derifunc(guess))
         while abs(d) > delta:
-            guess = guess - d
+            guess -= d
             d = (rootfunc(guess) / derifunc(guess))
 
         return guess

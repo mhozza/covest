@@ -1,11 +1,12 @@
 #! /usr/bin/env python
 import argparse
-import sys
 import glob
-import os
 import json
+import os
+import sys
 from collections import defaultdict
-from table_generator import format_table, square_table
+
+from covest.tools.table_generator import format_table, square_table
 
 SEPARATE_EF = True
 
@@ -181,21 +182,29 @@ def main(args):
                 else:
                     table_lines[key]['estimated_coverage'] = d.get('estimated_coverage', None)
                     table_lines[key]['estimated_error_rate'] = d.get('estimated_error_rate', None)
-                    table_lines[key]['estimated_loglikelihood'] = d.get('estimated_loglikelihood', None)
+                    table_lines[key]['estimated_loglikelihood'] = d.get(
+                        'estimated_loglikelihood', None
+                    )
                     table_lines[key]['estimated_q1'] = d.get('estimated_q1', None)
                     table_lines[key]['estimated_q2'] = d.get('estimated_q2', None)
                     table_lines[key]['estimated_q'] = d.get('estimated_q', None)
                     table_lines[key]['guessed_coverage'] = d.get('guessed_coverage', None)
                     table_lines[key]['guessed_error_rate'] = d.get('guessed_error_rate', None)
                     table_lines[key]['guessed_loglikelihood'] = d.get('guessed_loglikelihood', None)
-                    table_lines[key]['original_loglikelihood'] = d.get('original_loglikelihood', None)
+                    table_lines[key]['original_loglikelihood'] = d.get(
+                        'original_loglikelihood', None
+                    )
                     table_lines[key]['estimated_genome_size'] = d.get('estimated_genome_size', None)
 
             else:
                 if ef:
-                    table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
+                    table_lines[key]['khmer_ef_coverage'] = kmer_to_read_coverage(
+                        parse_khmer(fname), k
+                    )
                 else:
-                    table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(parse_khmer(fname), k)
+                    table_lines[key]['khmer_coverage'] = kmer_to_read_coverage(
+                        parse_khmer(fname), k
+                    )
         except Exception as e:
             print('Unable to process {}\n{}'.format(fname, e), file=sys.stderr)
 
@@ -260,7 +269,7 @@ def main(args):
         lines,
         template_file=format_templates[args.format],
         escape=format_escape.get(args.format, None),
-        list=True,
+        is_list=True,
     ))
 
 

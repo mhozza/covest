@@ -21,7 +21,7 @@ def main(args):
     if args.datasource:
         ds = Path(args.datasource)
         if ds.exists() and ds.is_dir():
-            for f in  ds.iterdir():
+            for f in ds.iterdir():
                 shutil.copy2(str(f), str(p))
         elif ds.exists() and not os.access(str(ds), os.X_OK):
             shutil.copy2(str(ds), str(p))
@@ -55,7 +55,8 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--type', type=str, choices=['simulated', 'real'],
                         default='simulated', help='Type of experiment')
     parser.add_argument('-d', '--datasource', type=str,
-                        help='Data source: either generation script or directory or kmer histogram file')
+                        help='Data source: either generation script or directory'
+                             ' or kmer histogram file')
     parser.add_argument('-r', '--runner', type=str,
                         help='Experiment runner: script for running the experiment')
     parser.add_argument('-c', '--config', type=str,

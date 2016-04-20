@@ -2,7 +2,6 @@
 import os
 import subprocess
 import argparse
-from copy import deepcopy
 
 source = 'data/chr14.fa'
 source = 'data/ecoli2.fa'

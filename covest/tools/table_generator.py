@@ -11,8 +11,8 @@ def lines_to_list(header, lines):
     return res
 
 
-def format_table(header, titles, lines, template_file, escape=None, round_floats=4, list=False):
-    def format(val):
+def format_table(header, titles, lines, template_file, escape=None, round_floats=4, is_list=False):
+    def format_val(val):
         if round_floats and type(val) is float:
             val = round(val, round_floats)
         if escape:
@@ -21,16 +21,17 @@ def format_table(header, titles, lines, template_file, escape=None, round_floats
             except:
                 pass
         return val
-    if not list:
+
+    if not is_list:
         lines = lines_to_list(header, lines)
     data = {
         'header': [
-            {'value': format(titles.get(h, h)), 'first': i == 0, 'last': i == len(header) - 1}
+            {'value': format_val(titles.get(h, h)), 'first': i == 0, 'last': i == len(header) - 1}
             for i, h in enumerate(header)
         ],
         'body': [
             {'line': [
-                {'value': format(v), 'first': i == 0, 'last': i == len(l) - 1}
+                {'value': format_val(v), 'first': i == 0, 'last': i == len(l) - 1}
                 for i, v in enumerate(l)
             ]} for l in lines
         ],

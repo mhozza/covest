@@ -1,6 +1,6 @@
 #! /usr/bin/env python
-from collections import defaultdict
 import argparse
+from collections import defaultdict
 
 
 def load_dist(fname):
@@ -35,7 +35,7 @@ def hist_stat(hist):
             z += 1
         else:
             if last == 0:
-                print z
+                print(z)
             z = 0
         last = v
 
@@ -58,7 +58,7 @@ def hist_port(hist, precision=None):
 def main(args):
     all_kmers, unique_kmers, observed_ones, hist = load_dist(args.input_histogram)
     t = hist_port(hist, 6)
-    print 'Trim at: ', t
+    print('Trim at: ', t)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')

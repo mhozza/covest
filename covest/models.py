@@ -1,25 +1,14 @@
 import itertools
 import multiprocessing
 from functools import lru_cache
-from math import exp, log
+from math import exp
 
-from covest import config
-from covest_poisson import truncated_poisson as tr_poisson
 import matplotlib.pyplot as plt
+from covest_poisson import truncated_poisson as tr_poisson
 from scipy.misc import comb
 
-
-def fix_zero(x, val=1):
-    if x == 0:
-        return val
-    else:
-        return x
-
-
-def safe_log(x):
-    if x is None or x <= 0:
-        return -config.INF
-    return log(x)
+from covest import config
+from covest.utils import safe_log, fix_zero
 
 
 class BasicModel:

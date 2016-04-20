@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-from collections import defaultdict
-import random
 import argparse
+import random
+from collections import defaultdict
 from os import path
 
 from Bio import SeqIO
-
 
 NS_IGNORE = 0
 NS_SINGLE = 1
@@ -87,7 +86,7 @@ def main(fname, out_fname, k, n_strategy):
             for i, v in enumerate(hist):
                 f.write('{} {}\n'.format(i, v))
     else:
-        print hist
+        print(hist)
 
 
 if __name__ == '__main__':
