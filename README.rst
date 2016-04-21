@@ -4,6 +4,9 @@ covest
 Tool that estimates coverage (and genome size) of dna sequence from
 reads.
 
+.. image:: https://travis-ci.org/mhozza/covest.svg?branch=master
+    :target: https://travis-ci.org/mhozza/covest
+
 Installation
 ------------
 
