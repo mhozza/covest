@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from . import config
 from .grid import initial_grid, optimize_grid
 from .inverse import inverse
-from .data import count_reads_size, load_hist, parse_data, print_output
+from .data import count_reads_size, process_histogram, parse_data, print_output, load_histogram
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print
@@ -140,15 +140,18 @@ class CoverageEstimator:
 @running_time_decorator
 def main(args):
     # Load histogram
-    hist_orig, hist, sample_factor = load_hist(
-        args.input_histogram, tail_sum=config.ESTIMATE_TAIL, auto_trim=args.auto_trim,
+    hist_orig = load_histogram(args.input_histogram)
+    hist, sample_factor = process_histogram(
+        hist_orig, tail_sum=config.ESTIMATE_TAIL, auto_trim=args.auto_trim,
         trim=args.trim, auto_sample=args.auto_sample, sample_factor=args.sample_factor,
     )
     reads_size = None
     if args.read_file is not None:
         reads_size = count_reads_size(args.read_file)
     err_scale = args.error_scale
-    if sample_factor and args.coverage:
+    if sample_factor is None:
+        sample_factor = 1
+    if args.coverage:
         args.coverage /= sample_factor
 
     # Model selection
@@ -182,7 +185,7 @@ def main(args):
                 guess = list(orig)
             else:
                 guess = list(model.defaults)
-                cov, e = compute_coverage_apx(hist_orig, args.kmer_size, args.read_length)
+                cov, e = compute_coverage_apx(hist, args.kmer_size, args.read_length)
                 if not (cov == 0 and e == 1):  # We were able to guess cov and e
                     guess[:2] = cov, e
                 if fix:
@@ -202,6 +205,7 @@ def main(args):
             )
 
             print_output(
+                hist_orig,
                 model,
                 res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
                 sample_factor=sample_factor, repeats=args.repeats, reads_size=reads_size,

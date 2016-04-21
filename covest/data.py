@@ -71,20 +71,21 @@ def auto_sample_hist(hist, target_size=50, sample_factor=2):
     return h, f
 
 
-def load_hist(fname, tail_sum=False, auto_trim=None, trim=None, auto_sample=None,
-              sample_factor=None):
-    hist = defaultdict(int)
-    max_hist = 0
-
+def load_histogram(fname):
+    hist = dict()
     with open(fname, 'r') as f:
         for line in f:
             l = line.split()
             i = int(l[0])
             cnt = int(l[1])
             hist[i] = cnt
-            max_hist = max(max_hist, i)
+    return hist
 
-    hist_l = [hist[b] for b in range(max_hist + 1)]
+
+def process_histogram(hist, tail_sum=False, auto_trim=None, trim=None, auto_sample=None,
+                      sample_factor=None):
+    max_hist = max(hist.keys())
+    hist_l = [hist.get(b, 0) for b in range(max_hist + 1)]
     if auto_sample is None and sample_factor is not None:
         hist_l = sample_hist(hist_l, sample_factor, trim)
     if auto_sample is not None:
@@ -102,7 +103,8 @@ def load_hist(fname, tail_sum=False, auto_trim=None, trim=None, auto_sample=None
     if tail_sum:
         tail = sum(hist_l[trim:]) if trim is not None else 0
         hist_trimmed.append(tail)
-    return hist_l, hist_trimmed, sample_factor
+    hist_l = hist_trimmed
+    return hist_l, sample_factor
 
 
 @lru_cache(maxsize=None)
@@ -142,6 +144,7 @@ def parse_data(data):
 
 
 def print_output(
+    hist_orig,
     model,
     estimated=None,
     guess=None,
@@ -184,8 +187,8 @@ def print_output(
 
         output_data['estimated_genome_size'] = safe_int(round(
             sum(
-                i * h for i, h in enumerate(model.hist)
-            ) / model.correct_c(estimated[0])
+                i * h for i, h in hist_orig.items()
+            ) / model.correct_c(estimated[0] * sample_factor)
         ))
 
         if reads_size is not None:

@@ -30,7 +30,6 @@ Other included tools
 -  ``prepare_experient.py`` tool for experiment pipeline setup
 -  ``experiment_table.py`` tool which collects data from experiment and
    create a nice table (html, tex, and csv formats are supported)
--  ``sam_to_fasta.py`` tool for converting sam file to fasta
 -  Read simulator:
 
    -  ``generate_sequence.py`` random sequence generator
