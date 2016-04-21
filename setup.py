@@ -5,8 +5,11 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 
-with open('README.md') as readme_file:
-    readme = readme_file.read()
+try:
+    with open('README.rst') as readme_file:
+        readme = readme_file.read()
+except FileNotFoundError:
+    readme = ''
 
 requirements = [
     'biopython',
@@ -15,11 +18,9 @@ requirements = [
     'pystache',
     'scipy<0.16',
     'pyfasta',
-    'pysam',
 ]
 
 test_requirements = [
-    # TODO: put package test requirements here
 ]
 
 covest_poisson = Extension(
@@ -57,7 +58,6 @@ setup(
         'bin/generate_sequence.py',
         'bin/read_simulator.py',
         'bin/prepare_experiment.py',
-        'bin/sam_to_fasta.py',
         'bin/experiment_table.py',
     ],
     license='GNU GPLv3',
@@ -65,12 +65,13 @@ setup(
     keywords='covest',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
-        'Intended Audience :: Developers',
+        'Intended Audience :: Science/Research',
         'License:: OSI Approved:: GNU General Public License v3(GPLv3)',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Topic :: Scientific/Engineering :: Bio-Informatics',
     ],
     test_suite='tests',
     tests_require=test_requirements

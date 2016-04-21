@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from . import config
 from .grid import initial_grid, optimize_grid
 from .inverse import inverse
-from .io import count_reads_size, load_hist, parse_data, print_output
+from .data import count_reads_size, load_hist, parse_data, print_output
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print
