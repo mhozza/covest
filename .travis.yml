@@ -24,7 +24,9 @@ deploy:
 env:
 - TOXENV=py35
 - TOXENV=py34
-install: pip install -U tox
+install:
+- pip install -U pip
+- pip install -U tox
 language: python
 python: 3.5
 script: tox

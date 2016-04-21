@@ -27,6 +27,7 @@ covest_poisson = Extension(
     'covest_poisson',
     libraries=['m'],
     sources=['c_src/covest_poissonmodule.c'],
+    extra_compile_args=['-std=c99'],
 )
 
 setup(
