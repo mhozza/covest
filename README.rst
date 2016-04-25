@@ -4,6 +4,8 @@ covest
 Tool that estimates coverage (and genome size) of dna sequence from
 reads.
 
+.. image:: https://badge.fury.io/py/covest.svg
+    :target: https://badge.fury.io/py/covest 
 .. image:: https://travis-ci.org/mhozza/covest.svg?branch=master
     :target: https://travis-ci.org/mhozza/covest
 
