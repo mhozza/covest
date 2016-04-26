@@ -60,6 +60,7 @@ setup(
         'bin/read_simulator.py',
         'bin/prepare_experiment.py',
         'bin/experiment_table.py',
+        'bin/hist_analyze.py',
     ],
     license='GNU GPLv3',
     zip_safe=False,
