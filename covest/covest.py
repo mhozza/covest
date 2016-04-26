@@ -18,13 +18,15 @@ def estimate_p(cc, alpha):
     return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
 
 
-def compute_coverage_apx(hist, k, r):
-    def fix_coverage(coverage):
-        return inverse(lambda c: (c - c * exp(-c)) / (1 - exp(-c) - c * exp(-c)))(coverage)
+def kmer_to_read_coverage(coverage, k, r):
+    return coverage * r / (r - k + 1)
 
-    def kmer_to_read_coverage(coverage):
-        return coverage * r / (r - k + 1)
 
+def fix_coverage(coverage):
+    return inverse(lambda c: (c - c * exp(-c)) / (1 - exp(-c) - c * exp(-c)))(coverage)
+
+
+def compute_coverage_apx(hist, k, r):   
     observed_ones = hist.get(1, 0)
     all_kmers = sum(i * h for i, h in hist.items())
     total_unique_kmers = sum(h for h in hist.values())

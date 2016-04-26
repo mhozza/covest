@@ -1,7 +1,7 @@
 import json
 import math
 import random
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from functools import lru_cache
 from os import path
 

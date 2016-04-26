@@ -156,7 +156,9 @@ class RepeatsModel(BasicModel):
         self.repeats = True
         self.bounds = (
             (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 0.9999), (0.0, 0.99), (0.0, 0.99))
-        self.defaults = self.defaults + tuple(self._default_param(i, default=0.5) for i in range(2, 5))
+        self.defaults = self.defaults + tuple(
+            self._default_param(i, default=0.5) for i in range(2, 5)
+        )
         self.threshold = threshold
 
     def get_hist_threshold(self, b_o, threshold):
