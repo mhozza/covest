@@ -28,21 +28,18 @@ def get_trim(hist, precision=0):
 
 
 def sample_hist(hist, factor=2, trim=None):
-    # if trim is None:
-    #     if len(hist) > 200:
-    #         trim = get_trim(hist, 5)
-    #     else:
-    #         trim = len(hist)
-    # else:
-    #     trim = min(len(hist), trim * factor)
-    #
-    # h = [0 for _ in range(trim)]
+    verbose_print('Sampling histogram...')
+    if trim is None:
+        if len(hist) > 300:
+            trim = get_trim(hist, 5)
+        else:
+            trim = max(hist)
+    else:
+        trim = min(max(hist), trim * factor)
+    hist = {k: v for k, v in hist.items() if k < trim}
     h = defaultdict(int)
     prob = 1.0 / factor
-    # max_h = 0
     for i, v in hist.items():
-        # if i >= trim:
-        #     break
         if i < 100:
             b = binom(i, prob)
             probs = [b.pmf(j) for j in range(1, i + 1)]
@@ -60,8 +57,6 @@ def sample_hist(hist, factor=2, trim=None):
             h[i] = math.ceil(v)
         else:
             h[i] = math.floor(v)
-        # if h[i]:
-            # max_h = i
     return {k: v for k, v in h.items() if v > 0}   # remove 0 elements
 
 
