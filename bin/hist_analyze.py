@@ -2,26 +2,24 @@
 import argparse
 
 from covest import config
-from covest.data import load_histogram, process_histogram
-from covest.covest import compute_coverage_apx
+from covest.data import load_histogram
+from covest.histogram import auto_sample_hist, get_trim
 
 
-def relative_difference(a, b):
-    res = abs(a - b) / a
-    print(a, b, res)
-    return res
+def remove_noise(hist):
+    total = sum(hist.values())
+    hist_denoised = {k: v for k, v in hist.items() if v/total > config.NOISE_THRESHOLD}
+    tail = sum(v for v in hist.values() if v/total <= config.NOISE_THRESHOLD)
+    return hist_denoised, tail
 
 
 def main(args):
     k, r = args.kmer_size, args.read_length
     hist_orig = load_histogram(args.input_histogram)
-    hist, sample_factor = process_histogram(hist_orig)
-    c, _ = compute_coverage_apx(hist, k, r)
-    while c > config.AUTO_SAMPLE_TARGET_COVERAGE:
-        sample_factor += 1
-        hist, sample_factor = process_histogram(hist_orig, sample_factor=sample_factor)
-        c, _ = compute_coverage_apx(hist, k, r)
-    print('Suggested sf:', sample_factor, 'target_coverage:', c, 'apx_coverage', c*sample_factor)
+    hist_orig, tail = remove_noise(hist_orig)
+    hist, sample_factor = auto_sample_hist(hist_orig, k, r)
+    print('Suggested sf:', sample_factor)
+    print('Suggested trim:', max(get_trim(hist, 6), min(50, max(hist))))
 
 
 if __name__ == '__main__':
