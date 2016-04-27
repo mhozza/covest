@@ -187,7 +187,7 @@ def run():
                         help='Only compute log likelihood')
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
     parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
-    parser.add_argument('-at', '--auto-trim', type=int, nargs='?', const=0,
+    parser.add_argument('-at', '--auto-trim', action='store_true',
                         help='Trim histogram automatically with this threshold')
     parser.add_argument('-sf', '--sample-factor', type=int,
                         help='Sample histogram with this factor')

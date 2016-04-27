@@ -50,7 +50,7 @@ def compute_coverage_apx(hist, k, r):
 def sample_histogram(hist, factor=2, trim=None):
     if trim is None:
         if len(hist) > 300:
-            trim = get_trim(hist, 5)
+            trim = get_trim(hist)
         else:
             trim = max(hist)
     else:
@@ -91,17 +91,25 @@ def auto_sample_hist(hist, k, r, trim=None):
     return h, f
 
 
-def get_trim(hist, precision=0):
+def remove_noise(hist):
+    total = sum(hist.values())
+    hist_denoised = {k: v for k, v in hist.items() if v/total > config.NOISE_THRESHOLD}
+    tail = sum(v for v in hist.values() if v/total <= config.NOISE_THRESHOLD)
+    return hist_denoised, tail
+
+
+def get_trim(hist):
+    hist, _ = remove_noise(hist)
     ss = float(sum(hist.values()))
     s = 0.0
-    trim = None
+    trim = max(hist)
     for i, h in sorted(hist.items()):
         s += h
         r = s / ss
-        if precision:
-            r = round(r, precision)
-        if r == 1 and trim is None:
+        r = round(r, config.AUTO_TRIM_PRECISION)
+        if r == 1:
             trim = i
+            break
     return trim
 
 
@@ -114,7 +122,7 @@ def trim_hist(hist, threshold):
     return {k: v for k, v in h.items() if v > 0}, tail
 
 
-def process_histogram(hist, k, r, auto_trim=None, trim=None, auto_sample=False, sample_factor=None):
+def process_histogram(hist, k, r, auto_trim=True, trim=None, auto_sample=True, sample_factor=None):
     hist = dict(hist)
     tail = 0
     if sample_factor is not None:
@@ -124,8 +132,8 @@ def process_histogram(hist, k, r, auto_trim=None, trim=None, auto_sample=False, 
         verbose_print('Sampling histogram...')
         hist, sample_factor = auto_sample_hist(hist, k, r, trim=trim)
         verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
-    if auto_trim is not None:
-        trim = get_trim(hist, auto_trim)
+    if auto_trim:
+        trim = get_trim(hist)
         verbose_print('Trimming at: {}'.format(trim))
         hist, tail = trim_hist(hist, trim)
     elif trim is not None:
