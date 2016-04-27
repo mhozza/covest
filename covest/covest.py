@@ -26,7 +26,10 @@ def fix_coverage(coverage):
     return inverse(lambda c: (c - c * exp(-c)) / (1 - exp(-c) - c * exp(-c)))(coverage)
 
 
-def compute_coverage_apx(hist, k, r):   
+def compute_coverage_apx(hist, k, r):
+    hist = dict(hist)
+    tail = hist.pop('tail', 0)
+    hist[max(hist) + 1] = tail
     observed_ones = hist.get(1, 0)
     all_kmers = sum(i * h for i, h in hist.items())
     total_unique_kmers = sum(h for h in hist.values())
@@ -54,7 +57,7 @@ def compute_coverage_apx(hist, k, r):
         # return corrected coverage and error estimate
         if estimated_p > 0:
             # function for conversion between kmer and base coverage
-            return float(kmer_to_read_coverage(cov / estimated_p)), float(e)
+            return float(kmer_to_read_coverage(cov / estimated_p, k, r)), float(e)
         else:
             return 0.0, float(e)
     except ZeroDivisionError:

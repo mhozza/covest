@@ -1,7 +1,7 @@
 import json
 import math
 import random
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from functools import lru_cache
 from os import path
 
@@ -99,8 +99,7 @@ def trim_hist(hist, threshold):
     return {k: v for k, v in h.items() if v > 0}, tail
 
 
-def process_histogram(hist, tail_sum=False, auto_trim=None, trim=None, auto_sample=None,
-                      sample_factor=None):
+def process_histogram(hist, auto_trim=None, trim=None, auto_sample=None, sample_factor=None):
     hist = dict(hist)
     tail = 0
     if auto_sample is None and sample_factor is not None:
