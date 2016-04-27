@@ -100,13 +100,16 @@ class BasicModel:
             return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20]]
 
         def adjust_probs(probs, hist=False):
-            if not hist and config.ESTIMATE_TAIL:
-                sp = sum(probs[1:-1])
-                probs[-1] = 1 - sp
-            if cumulative:
-                return [0 if p is None else i * p for i, p in enumerate(probs)]
+            max_j = max(probs)
+            if hist:
+                tail = self.tail
             else:
-                return probs
+                sp = sum(probs.values())
+                tail = 1 - sp
+            if cumulative:
+                return [probs.get(i, 0) * i for i in range(max_j)]
+            else:
+                return [probs.get(i, 0) for i in range(max_j)]
 
         hs = float(sum(self.hist.values()))
         hp = adjust_probs({k: f / hs for k, f in self.hist.items()}, hist=True)
@@ -115,7 +118,7 @@ class BasicModel:
         if orig is not None and None not in orig:
             op = adjust_probs(self.compute_probabilities(*orig))
         else:
-            op = adjust_probs([0 for _ in range(len(self.hist))])
+            op = adjust_probs({1:0})
 
         if log_scale:
             plt.yscale('log')
