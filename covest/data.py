@@ -75,7 +75,6 @@ def print_output(
     orig_q2=None,
     orig_q=None,
     sample_factor=None,
-    repeats=False,
     silent=False,
     reads_size=None,
 ):
@@ -86,7 +85,7 @@ def print_output(
         output_data['guessed_loglikelihood'] = model.compute_loglikelihood(*guess)
         output_data['guessed_coverage'] = guess[0] * sample_factor
         output_data['guessed_error_rate'] = guess[1]
-        if repeats:
+        if model.repeats:
             output_data['guessed_q1'] = guess[2]
             output_data['guessed_q2'] = guess[3]
             output_data['guessed_q'] = guess[4]
@@ -95,7 +94,7 @@ def print_output(
         output_data['estimated_loglikelihood'] = model.compute_loglikelihood(*estimated)
         output_data['estimated_coverage'] = estimated[0] * sample_factor
         output_data['estimated_error_rate'] = estimated[1]
-        if repeats:
+        if model.repeats:
             output_data['estimated_q1'] = estimated[2]
             output_data['estimated_q2'] = estimated[3]
             output_data['estimated_q'] = estimated[4]
@@ -123,7 +122,7 @@ def print_output(
         orig_error_rate = estimated[1]
 
     if orig_coverage is not None:
-        if repeats:
+        if model.repeats:
             output_data['original_loglikelihood'] = model.compute_loglikelihood(
                 orig_coverage, orig_error_rate, orig_q1, orig_q2, orig_q
             )

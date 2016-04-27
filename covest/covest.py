@@ -13,6 +13,22 @@ from .perf import running_time, running_time_decorator
 from .utils import verbose_print
 
 
+MODEL_OPTIONS = {
+    'simple': BasicModel,
+    'repeat': RepeatsModel,
+}
+
+
+def select_model(m):
+    if m in MODEL_OPTIONS:
+        return MODEL_OPTIONS[m]
+    else:
+        for k, model in MODEL_OPTIONS.items():
+            if k.startswith(m):
+                return model
+    raise ValueError('Not such model: {}.'.format(m))
+
+
 class CoverageEstimator:
     GRID_SEARCH_TYPE_NONE = 0
     GRID_SEARCH_TYPE_PRE = 1
@@ -112,13 +128,8 @@ def main(args):
     if args.coverage:
         args.coverage /= sample_factor
 
-    # Model selection
-    if args.repeats:
-        model_class = RepeatsModel
-    else:
-        model_class = BasicModel
     # Model initialisation
-    model = model_class(
+    model = select_model(args.model)(
         args.kmer_size, args.read_length, hist, tail,
         max_error=8, max_cov=args.max_coverage,
         min_single_copy_ratio=args.min_q1,
@@ -165,7 +176,7 @@ def main(args):
                 hist_orig,
                 model,
                 res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
-                sample_factor=sample_factor, repeats=args.repeats, reads_size=reads_size,
+                sample_factor=sample_factor, reads_size=reads_size,
             )
 
         # Draw plot
@@ -185,7 +196,8 @@ def run():
                         default=config.DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('--plot', type=bool, nargs='?', const=False,
                         help='Plot probabilities (use --plot 1 to plot probs * j)')
-    parser.add_argument('-rp', '--repeats', action='store_true', help='Estimate with repeats')
+    parser.add_argument('-m', '--model', type=str, default='simple',
+                        help='Select models for estimation. Options: {}'.format(list(MODEL_OPTIONS.keys())))
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
