@@ -71,15 +71,35 @@ def auto_sample_hist(hist, target_size=50, sample_factor=2):
     return h, f
 
 
+class InvalidFormatException(Exception):
+    def __init__(self, fname):
+        self.fname = fname
+    def __str__(self):
+        return 'Unable to parse %s. Unsupported format.' % self.fname
+
+
 def load_histogram(fname):
     hist = dict()
     with open(fname, 'r') as f:
         for line in f:
-            l = line.split()
-            i = int(l[0])
-            cnt = int(l[1])
-            hist[i] = cnt
+            try:
+                l = line.split()
+                i = int(l[0])
+                cnt = int(l[1])
+                hist[i] = cnt
+            except (ValueError, KeyError):
+                raise InvalidFormatException(fname)
     return hist
+
+
+def trim_hist(hist, threshold):
+    hist_trimmed = hist[:threshold]
+    tail = sum(hist[threshold:])
+    # remove trailing zeros
+    while hist_trimmed[-1] == 0:
+        hist_trimmed.pop()
+    print(hist_trimmed)
+    return hist_trimmed, tail
 
 
 def process_histogram(hist, tail_sum=False, auto_trim=None, trim=None, auto_sample=None,
@@ -93,15 +113,16 @@ def process_histogram(hist, tail_sum=False, auto_trim=None, trim=None, auto_samp
             sample_factor = config.DEFAULT_SAMPLE_FACTOR
         hist_l, sample_factor = auto_sample_hist(hist_l, auto_sample, sample_factor)
         verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
-    hist_trimmed = list(hist_l)
     if auto_trim is not None:
         trim = get_trim(hist_l, auto_trim)
         verbose_print('Trimming at: {}'.format(trim))
-        hist_trimmed = hist_l[:trim]
+        hist_trimmed, tail = trim_hist(hist_l, trim)
     elif trim is not None:
-        hist_trimmed = hist_l[:trim]
+        hist_trimmed, tail = trim_hist(hist_l, trim)
+    else:
+        hist_trimmed = list(hist_l)
+        tail = 0
     if tail_sum:
-        tail = sum(hist_l[trim:]) if trim is not None else 0
         hist_trimmed.append(tail)
     hist_l = hist_trimmed
     return hist_l, sample_factor
