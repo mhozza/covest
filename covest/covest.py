@@ -147,7 +147,7 @@ def main(args):
     # Load histogram
     hist_orig = load_histogram(args.input_histogram)
     hist, sample_factor = process_histogram(
-        hist_orig, tail_sum=config.ESTIMATE_TAIL, auto_trim=args.auto_trim,
+        hist_orig, auto_trim=args.auto_trim,
         trim=args.trim, auto_sample=args.auto_sample, sample_factor=args.sample_factor,
     )
     reads_size = None

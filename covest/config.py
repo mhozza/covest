@@ -2,7 +2,6 @@ MAX_EXP = 200
 GRID_DEPTH = 3
 INF = float('inf')
 VERBOSE = True
-ESTIMATE_TAIL = True
 PLOT_LOG_SCALE = True
 USE_BIGFLOAT = False
 STEP = 1.1
