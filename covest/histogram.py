@@ -10,9 +10,6 @@ from .utils import estimate_p, kmer_to_read_coverage, fix_coverage, verbose_prin
 
 
 def compute_coverage_apx(hist, k, r):
-    hist = dict(hist)
-    tail = hist.pop('tail', 0)
-    hist[max(hist) + 1] = tail
     observed_ones = hist.get(1, 0)
     all_kmers = sum(i * h for i, h in hist.items())
     total_unique_kmers = sum(h for h in hist.values())
@@ -55,9 +52,11 @@ def sample_histogram(hist, factor=2, trim=None):
             trim = max(hist)
     else:
         trim = min(max(hist), trim * factor)
+
     hist = {k: v for k, v in hist.items() if k < trim}
     h = defaultdict(int)
     prob = 1.0 / factor
+
     for i, v in hist.items():
         if i < 100:
             b = binom(i, prob)
@@ -69,17 +68,12 @@ def sample_histogram(hist, factor=2, trim=None):
             h[j + 1] += v * p
 
     h = dict(h)
-
     for i, v in h.items():
         d = v - round(v)
-        if random.random() < d:
-            h[i] = ceil(v)
-        else:
-            h[i] = floor(v)
+        h[i] = ceil(v) if random.random() < d else floor(v)
     return {k: v for k, v in h.items() if v > 0}   # remove 0 elements
 
 
-# @Todo: return c and e
 def auto_sample_hist(hist, k, r, trim=None):
     h = dict(hist)
     f = 1
@@ -88,18 +82,17 @@ def auto_sample_hist(hist, k, r, trim=None):
         f += 1
         h = sample_histogram(hist, factor=f, trim=trim)
         c, e = compute_coverage_apx(h, k, r)
-    return h, f
+    return h, f, c, e
 
 
 def remove_noise(hist):
     total = sum(hist.values())
     hist_denoised = {k: v for k, v in hist.items() if v/total > config.NOISE_THRESHOLD}
-    tail = sum(v for v in hist.values() if v/total <= config.NOISE_THRESHOLD)
-    return hist_denoised, tail
+    return hist_denoised
 
 
 def get_trim(hist):
-    hist, _ = remove_noise(hist)
+    hist = remove_noise(hist)
     ss = float(sum(hist.values()))
     s = 0.0
     trim = max(hist)
@@ -122,23 +115,22 @@ def trim_hist(hist, threshold):
     return {k: v for k, v in h.items() if v > 0}, tail
 
 
-def process_histogram(hist, k, r, auto_trim=True, trim=None, auto_sample=True, sample_factor=None):
+def process_histogram(hist, k, r, auto_trim=True, trim=None, auto_sample=True, sample_factor=1):
     hist = dict(hist)
     tail = 0
-    if sample_factor is not None:
+    if sample_factor > 1:
         verbose_print('Sampling histogram...')
         hist = sample_histogram(hist, sample_factor, trim)
     if auto_sample:
         verbose_print('Sampling histogram...')
-        hist, sample_factor = auto_sample_hist(hist, k, r, trim=trim)
+        hist, sample_factor, c, e = auto_sample_hist(hist, k, r, trim=trim)
         verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
+    else:
+        c, e = compute_coverage_apx(hist, k, r)
     if auto_trim:
         trim = get_trim(hist)
         verbose_print('Trimming at: {}'.format(trim))
         hist, tail = trim_hist(hist, trim)
     elif trim is not None:
         hist, tail = trim_hist(hist, trim)
-    hist['tail'] = tail
-    if sample_factor is None:
-        sample_factor = 1
-    return hist, sample_factor
+    return hist, tail, sample_factor, c, e

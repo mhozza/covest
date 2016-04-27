@@ -12,7 +12,7 @@ from covest.utils import safe_log, fix_zero
 
 
 class BasicModel:
-    def __init__(self, k, r, hist, max_error=None, max_cov=None, *args, **kwargs):
+    def __init__(self, k, r, hist, tail, max_error=None, max_cov=None, *args, **kwargs):
         self.repeats = False
         self.k = k
         self.r = r
@@ -20,7 +20,7 @@ class BasicModel:
         self.defaults = (1, self._default_param(1))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
         self.hist = hist
-        self.tail = self.hist.pop('tail', 0)
+        self.tail = tail
         if max_error is None:
             self.max_error = self.k + 1
         else:
@@ -150,9 +150,9 @@ class BasicModel:
 
 
 class RepeatsModel(BasicModel):
-    def __init__(self, k, r, hist, max_error=None, max_cov=None, threshold=1e-8,
+    def __init__(self, k, r, hist, tail, max_error=None, max_cov=None, threshold=1e-8,
                  min_single_copy_ratio=0.3, *args, **kwargs):
-        super(RepeatsModel, self).__init__(k, r, hist, max_error=max_error)
+        super(RepeatsModel, self).__init__(k, r, hist, tail, max_error=max_error)
         self.repeats = True
         self.bounds = (
             (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 0.9999), (0.0, 0.99), (0.0, 0.99))

@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 from . import config
 from .data import count_reads_size, parse_data, print_output, load_histogram
 from .grid import initial_grid, optimize_grid
-from .histogram import process_histogram, compute_coverage_apx
+from .histogram import process_histogram
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print
@@ -95,7 +95,8 @@ class CoverageEstimator:
 def main(args):
     # Load histogram
     hist_orig = load_histogram(args.input_histogram)
-    hist, sample_factor = process_histogram(
+    # Process histogram and obtain first guess for c and e
+    hist, tail, sample_factor, guess_c, guess_e = process_histogram(
         hist_orig, args.kmer_size, args.read_length, auto_trim=args.auto_trim,
         trim=args.trim, auto_sample=args.auto_sample, sample_factor=args.sample_factor,
     )
@@ -115,7 +116,7 @@ def main(args):
         model_class = BasicModel
     # Model initialisation
     model = model_class(
-        args.kmer_size, args.read_length, hist,
+        args.kmer_size, args.read_length, hist, tail,
         max_error=8, max_cov=args.max_coverage,
         min_single_copy_ratio=args.min_q1,
     )
@@ -139,9 +140,8 @@ def main(args):
                 guess = list(orig)
             else:
                 guess = list(model.defaults)
-                cov, e = compute_coverage_apx(hist, args.kmer_size, args.read_length)
-                if not (cov == 0 and e == 1):  # We were able to guess cov and e
-                    guess[:2] = cov, e
+                if not (guess_c == 0 and guess_e == 1):  # We were able to guess cov and e
+                    guess[:2] = guess_c, guess_e
                 if fix:
                     for i, v in fix:
                         if v is not None:
