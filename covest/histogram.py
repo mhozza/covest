@@ -115,22 +115,23 @@ def trim_hist(hist, threshold):
     return {k: v for k, v in h.items() if v > 0}, tail
 
 
-def process_histogram(hist, k, r, auto_trim=True, trim=None, auto_sample=True, sample_factor=1):
+def process_histogram(hist, k, r, trim=None, sample_factor=None):
     hist = dict(hist)
     tail = 0
-    if sample_factor > 1:
+    if sample_factor is not None and sample_factor > 1:
         verbose_print('Sampling histogram...')
         hist = sample_histogram(hist, sample_factor, trim)
-    if auto_sample:
+    if sample_factor is None:
         verbose_print('Sampling histogram...')
         hist, sample_factor, c, e = auto_sample_hist(hist, k, r, trim=trim)
         verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
     else:
         c, e = compute_coverage_apx(hist, k, r)
-    if auto_trim:
+    if trim is None:
         trim = get_trim(hist)
         verbose_print('Trimming at: {}'.format(trim))
         hist, tail = trim_hist(hist, trim)
-    elif trim is not None:
+    elif trim > 0:
+        verbose_print('Trimming at: {}'.format(trim))
         hist, tail = trim_hist(hist, trim)
     return hist, tail, sample_factor, c, e

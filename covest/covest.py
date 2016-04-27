@@ -94,11 +94,14 @@ class CoverageEstimator:
 @running_time_decorator
 def main(args):
     # Load histogram
+    verbose_print('Loading histogram {} with parameters k={} r={}.'.format(
+        args.input_histogram, args.kmer_size, args.read_length,
+    ))
     hist_orig = load_histogram(args.input_histogram)
     # Process histogram and obtain first guess for c and e
     hist, tail, sample_factor, guess_c, guess_e = process_histogram(
-        hist_orig, args.kmer_size, args.read_length, auto_trim=args.auto_trim,
-        trim=args.trim, auto_sample=args.auto_sample, sample_factor=args.sample_factor,
+        hist_orig, args.kmer_size, args.read_length,
+        trim=args.trim, sample_factor=args.sample_factor,
     )
     reads_size = None
     if args.read_file is not None:
@@ -134,7 +137,7 @@ def main(args):
                 guess = parsed_data.guess
                 res = parsed_data.estimated
         else:
-            verbose_print('Estimating coverage for {}'.format(args.input_histogram))
+            verbose_print('Estimating coverage...')
             # Compute initial guess
             if args.start_original:
                 guess = list(orig)
@@ -186,13 +189,11 @@ def run():
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
-    parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
-    parser.add_argument('-at', '--auto-trim', action='store_true',
-                        help='Trim histogram automatically with this threshold')
-    parser.add_argument('-sf', '--sample-factor', type=int,
-                        help='Sample histogram with this factor')
-    parser.add_argument('-as', '--auto-sample', action='store_true',
-                        help='Sample histogram automatically')
+    parser.add_argument('-t', '--trim', type=int, default=None,
+                        help='Trim histogram at this value. Set to 0 to disable automatic trimming.')
+    parser.add_argument('-sf', '--sample-factor', type=int, default=None,
+                        help='Use fixed sample factor for histogram sampling instead of automatic.'
+                             ' Set to 1 to not sample at all.')
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
@@ -207,7 +208,7 @@ def run():
     parser.add_argument('-so', '--start-original', action='store_true',
                         help='Start form given values')
     parser.add_argument('-f', '--fix', action='store_true',
-                        help='Fix some vars, optimize others')
+                        help='Fix some params, optimize others')
     parser.add_argument('-T', '--thread-count', default=config.DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
     parser.add_argument('-s', '--genome-size', dest='read_file',
