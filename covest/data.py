@@ -14,10 +14,10 @@ from .utils import safe_int, verbose_print
 
 
 def get_trim(hist, precision=0):
-    ss = float(sum(hist))
+    ss = float(sum(hist.values()))
     s = 0.0
     trim = None
-    for i, h in enumerate(hist):
+    for i, h in sorted(hist.items()):
         s += h
         r = s / ss
         if precision:
@@ -28,20 +28,18 @@ def get_trim(hist, precision=0):
 
 
 def sample_hist(hist, factor=2, trim=None):
+    verbose_print('Sampling histogram...')
     if trim is None:
-        if len(hist) > 200:
+        if len(hist) > 300:
             trim = get_trim(hist, 5)
         else:
-            trim = len(hist)
+            trim = max(hist)
     else:
-        trim = min(len(hist), trim * factor)
-
-    h = [0 for _ in range(trim)]
+        trim = min(max(hist), trim * factor)
+    hist = {k: v for k, v in hist.items() if k < trim}
+    h = defaultdict(int)
     prob = 1.0 / factor
-    max_h = 0
-    for i, v in enumerate(hist):
-        if i >= trim:
-            break
+    for i, v in hist.items():
         if i < 100:
             b = binom(i, prob)
             probs = [b.pmf(j) for j in range(1, i + 1)]
@@ -51,60 +49,75 @@ def sample_hist(hist, factor=2, trim=None):
         for j, p in enumerate(probs):
             h[j + 1] += v * p
 
-    for i, v in enumerate(h):
+    h = dict(h)
+
+    for i, v in h.items():
         d = v - round(v)
         if random.random() < d:
             h[i] = math.ceil(v)
         else:
             h[i] = math.floor(v)
-        if h[i]:
-            max_h = i
-    return h[:max_h + 1]
+    return {k: v for k, v in h.items() if v > 0}   # remove 0 elements
 
 
 def auto_sample_hist(hist, target_size=50, sample_factor=2):
-    h = list(hist)
+    h = dict(hist)
     f = 1
-    while len(h) > target_size:
+    while max(h) > target_size:
         h = sample_hist(h, sample_factor)
         f *= sample_factor
     return h, f
+
+
+class InvalidFormatException(Exception):
+    def __init__(self, fname):
+        self.fname = fname
+    def __str__(self):
+        return 'Unable to parse %s. Unsupported format.' % self.fname
 
 
 def load_histogram(fname):
     hist = dict()
     with open(fname, 'r') as f:
         for line in f:
-            l = line.split()
-            i = int(l[0])
-            cnt = int(l[1])
-            hist[i] = cnt
+            try:
+                l = line.split()
+                i = int(l[0])
+                cnt = int(l[1])
+                hist[i] = cnt
+            except (ValueError, KeyError):
+                raise InvalidFormatException(fname)
     return hist
+
+
+def trim_hist(hist, threshold):
+    if threshold >= max(hist):
+        return hist, 0
+    h = {k: v for k, v in hist.items() if k < threshold}
+    tail = sum(v for k, v in hist.items() if k >= threshold)
+    # remove 0 elements
+    return {k: v for k, v in h.items() if v > 0}, tail
 
 
 def process_histogram(hist, tail_sum=False, auto_trim=None, trim=None, auto_sample=None,
                       sample_factor=None):
-    max_hist = max(hist.keys())
-    hist_l = [hist.get(b, 0) for b in range(max_hist + 1)]
+    hist = dict(hist)
+    tail = 0
     if auto_sample is None and sample_factor is not None:
-        hist_l = sample_hist(hist_l, sample_factor, trim)
+        hist = sample_hist(hist, sample_factor, trim)
     if auto_sample is not None:
         if sample_factor is None:
             sample_factor = config.DEFAULT_SAMPLE_FACTOR
-        hist_l, sample_factor = auto_sample_hist(hist_l, auto_sample, sample_factor)
+        hist, sample_factor = auto_sample_hist(hist, auto_sample, sample_factor)
         verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
-    hist_trimmed = list(hist_l)
     if auto_trim is not None:
-        trim = get_trim(hist_l, auto_trim)
+        trim = get_trim(hist, auto_trim)
         verbose_print('Trimming at: {}'.format(trim))
-        hist_trimmed = hist_l[:trim]
+        hist, tail = trim_hist(hist, trim)
     elif trim is not None:
-        hist_trimmed = hist_l[:trim]
-    if tail_sum:
-        tail = sum(hist_l[trim:]) if trim is not None else 0
-        hist_trimmed.append(tail)
-    hist_l = hist_trimmed
-    return hist_l, sample_factor
+        hist, tail = trim_hist(hist, trim)
+    hist['tail'] = tail
+    return hist, sample_factor
 
 
 @lru_cache(maxsize=None)

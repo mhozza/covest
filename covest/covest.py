@@ -25,9 +25,9 @@ def compute_coverage_apx(hist, k, r):
     def kmer_to_read_coverage(coverage):
         return coverage * r / (r - k + 1)
 
-    observed_ones = hist[1]
-    all_kmers = sum(i * h for i, h in enumerate(hist))
-    total_unique_kmers = sum(h for h in hist)
+    observed_ones = hist.get(1, 0)
+    all_kmers = sum(i * h for i, h in hist.items())
+    total_unique_kmers = sum(h for h in hist.values())
 
     if total_unique_kmers == 0:
         return 0.0, 1.0
