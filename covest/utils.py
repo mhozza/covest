@@ -1,7 +1,8 @@
 import sys
-from math import log
+from math import log, exp
 
 from covest import config
+from .inverse import inverse
 
 
 def print_wrap(x, label='', cond=True):
@@ -31,3 +32,15 @@ def safe_log(x):
     if x is None or x <= 0:
         return -config.INF
     return log(x)
+
+
+def estimate_p(cc, alpha):
+    return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
+
+
+def kmer_to_read_coverage(coverage, k, r):
+    return coverage * r / (r - k + 1)
+
+
+def fix_coverage(coverage):
+    return inverse(lambda c: (c - c * exp(-c)) / (1 - exp(-c) - c * exp(-c)))(coverage)

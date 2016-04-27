@@ -1,77 +1,15 @@
 import json
-import math
-import random
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from functools import lru_cache
 from os import path
 
-from scipy.stats import binom
-
-from covest_poisson import poisson
-
-from . import config
 from .utils import safe_int, verbose_print
-
-
-def get_trim(hist, precision=0):
-    ss = float(sum(hist.values()))
-    s = 0.0
-    trim = None
-    for i, h in sorted(hist.items()):
-        s += h
-        r = s / ss
-        if precision:
-            r = round(r, precision)
-        if r == 1 and trim is None:
-            trim = i
-    return trim
-
-
-def sample_hist(hist, factor=2, trim=None):
-    verbose_print('Sampling histogram...')
-    if trim is None:
-        if len(hist) > 300:
-            trim = get_trim(hist, 5)
-        else:
-            trim = max(hist)
-    else:
-        trim = min(max(hist), trim * factor)
-    hist = {k: v for k, v in hist.items() if k < trim}
-    h = defaultdict(int)
-    prob = 1.0 / factor
-    for i, v in hist.items():
-        if i < 100:
-            b = binom(i, prob)
-            probs = [b.pmf(j) for j in range(1, i + 1)]
-        else:
-            probs = [poisson(i * prob, j) for j in range(1, i + 1)]
-
-        for j, p in enumerate(probs):
-            h[j + 1] += v * p
-
-    h = dict(h)
-
-    for i, v in h.items():
-        d = v - round(v)
-        if random.random() < d:
-            h[i] = math.ceil(v)
-        else:
-            h[i] = math.floor(v)
-    return {k: v for k, v in h.items() if v > 0}   # remove 0 elements
-
-
-def auto_sample_hist(hist, target_size=50, sample_factor=2):
-    h = dict(hist)
-    f = 1
-    while max(h) > target_size:
-        h = sample_hist(h, sample_factor)
-        f *= sample_factor
-    return h, f
 
 
 class InvalidFormatException(Exception):
     def __init__(self, fname):
         self.fname = fname
+
     def __str__(self):
         return 'Unable to parse %s. Unsupported format.' % self.fname
 
@@ -88,36 +26,6 @@ def load_histogram(fname):
             except (ValueError, KeyError):
                 raise InvalidFormatException(fname)
     return hist
-
-
-def trim_hist(hist, threshold):
-    if threshold >= max(hist):
-        return hist, 0
-    h = {k: v for k, v in hist.items() if k < threshold}
-    tail = sum(v for k, v in hist.items() if k >= threshold)
-    # remove 0 elements
-    return {k: v for k, v in h.items() if v > 0}, tail
-
-
-def process_histogram(hist, tail_sum=False, auto_trim=None, trim=None, auto_sample=None,
-                      sample_factor=None):
-    hist = dict(hist)
-    tail = 0
-    if auto_sample is None and sample_factor is not None:
-        hist = sample_hist(hist, sample_factor, trim)
-    if auto_sample is not None:
-        if sample_factor is None:
-            sample_factor = config.DEFAULT_SAMPLE_FACTOR
-        hist, sample_factor = auto_sample_hist(hist, auto_sample, sample_factor)
-        verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
-    if auto_trim is not None:
-        trim = get_trim(hist, auto_trim)
-        verbose_print('Trimming at: {}'.format(trim))
-        hist, tail = trim_hist(hist, trim)
-    elif trim is not None:
-        hist, tail = trim_hist(hist, trim)
-    hist['tail'] = tail
-    return hist, sample_factor
 
 
 @lru_cache(maxsize=None)
@@ -225,7 +133,6 @@ def print_output(
             )
 
     output_data['hist_size'] = len(model.hist)
-    output_data['tail_included'] = config.ESTIMATE_TAIL
     output_data['sample_factor'] = sample_factor
 
     if not silent:

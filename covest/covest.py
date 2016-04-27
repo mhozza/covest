@@ -1,62 +1,16 @@
 import argparse
 import json
-from math import exp
 from multiprocessing import Pool
 
 from scipy.optimize import minimize
 
 from . import config
+from .data import count_reads_size, parse_data, print_output, load_histogram
 from .grid import initial_grid, optimize_grid
-from .inverse import inverse
-from .data import count_reads_size, process_histogram, parse_data, print_output, load_histogram
+from .histogram import process_histogram
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print
-
-
-def estimate_p(cc, alpha):
-    return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
-
-
-def compute_coverage_apx(hist, k, r):
-    def fix_coverage(coverage):
-        return inverse(lambda c: (c - c * exp(-c)) / (1 - exp(-c) - c * exp(-c)))(coverage)
-
-    def kmer_to_read_coverage(coverage):
-        return coverage * r / (r - k + 1)
-
-    observed_ones = hist.get(1, 0)
-    all_kmers = sum(i * h for i, h in hist.items())
-    total_unique_kmers = sum(h for h in hist.values())
-
-    if total_unique_kmers == 0:
-        return 0.0, 1.0
-
-    # discard first column
-    all_kmers -= observed_ones
-    unique_kmers = total_unique_kmers - observed_ones
-    # compute coverage from hist >=2
-    try:
-        cov = all_kmers / unique_kmers
-        cov = fix_coverage(cov)
-        # fix unique kmers
-        unique_kmers /= (1.0 - exp(-cov) - cov * exp(-cov))
-        # compute alpha (error read ratio)
-        estimated_ones = unique_kmers * cov * exp(-cov)
-        estimated_zeros = unique_kmers * exp(-cov)
-        error_ones = max(0.0, observed_ones - estimated_ones)
-        alpha = error_ones / (total_unique_kmers + estimated_zeros)
-        # estimate probability of correct kmer and error rate
-        estimated_p = max(0.0, estimate_p(cov, alpha))
-        e = 1 - estimated_p ** (1.0 / k)
-        # return corrected coverage and error estimate
-        if estimated_p > 0:
-            # function for conversion between kmer and base coverage
-            return float(kmer_to_read_coverage(cov / estimated_p)), float(e)
-        else:
-            return 0.0, float(e)
-    except ZeroDivisionError:
-        return 0.0, 1.0
 
 
 class CoverageEstimator:
@@ -140,10 +94,14 @@ class CoverageEstimator:
 @running_time_decorator
 def main(args):
     # Load histogram
+    verbose_print('Loading histogram {} with parameters k={} r={}.'.format(
+        args.input_histogram, args.kmer_size, args.read_length,
+    ))
     hist_orig = load_histogram(args.input_histogram)
-    hist, sample_factor = process_histogram(
-        hist_orig, tail_sum=config.ESTIMATE_TAIL, auto_trim=args.auto_trim,
-        trim=args.trim, auto_sample=args.auto_sample, sample_factor=args.sample_factor,
+    # Process histogram and obtain first guess for c and e
+    hist, tail, sample_factor, guess_c, guess_e = process_histogram(
+        hist_orig, args.kmer_size, args.read_length,
+        trim=args.trim, sample_factor=args.sample_factor,
     )
     reads_size = None
     if args.read_file is not None:
@@ -161,7 +119,7 @@ def main(args):
         model_class = BasicModel
     # Model initialisation
     model = model_class(
-        args.kmer_size, args.read_length, hist,
+        args.kmer_size, args.read_length, hist, tail,
         max_error=8, max_cov=args.max_coverage,
         min_single_copy_ratio=args.min_q1,
     )
@@ -179,15 +137,14 @@ def main(args):
                 guess = parsed_data.guess
                 res = parsed_data.estimated
         else:
-            verbose_print('Estimating coverage for {}'.format(args.input_histogram))
+            verbose_print('Estimating coverage...')
             # Compute initial guess
             if args.start_original:
                 guess = list(orig)
             else:
                 guess = list(model.defaults)
-                cov, e = compute_coverage_apx(hist, args.kmer_size, args.read_length)
-                if not (cov == 0 and e == 1):  # We were able to guess cov and e
-                    guess[:2] = cov, e
+                if not (guess_c == 0 and guess_e == 1):  # We were able to guess cov and e
+                    guess[:2] = guess_c, guess_e
                 if fix:
                     for i, v in fix:
                         if v is not None:
@@ -232,14 +189,11 @@ def run():
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
-    parser.add_argument('-t', '--trim', type=int, help='Trim histogram at this value')
-    parser.add_argument('-at', '--auto-trim', type=int, nargs='?', const=0,
-                        help='Trim histogram automatically with this threshold')
-    parser.add_argument('-sf', '--sample-factor', type=int,
-                        help='Sample histogram with this factor')
-    parser.add_argument('-as', '--auto-sample', type=int, nargs='?',
-                        const=config.DEFAULT_SAMPLE_TARGET,
-                        help='Sample histogram automatically to this target size')
+    parser.add_argument('-t', '--trim', type=int, default=None,
+                        help='Trim histogram at this value. Set to 0 to disable automatic trimming.')
+    parser.add_argument('-sf', '--sample-factor', type=int, default=None,
+                        help='Use fixed sample factor for histogram sampling instead of automatic.'
+                             ' Set to 1 to not sample at all.')
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
@@ -254,7 +208,7 @@ def run():
     parser.add_argument('-so', '--start-original', action='store_true',
                         help='Start form given values')
     parser.add_argument('-f', '--fix', action='store_true',
-                        help='Fix some vars, optimize others')
+                        help='Fix some params, optimize others')
     parser.add_argument('-T', '--thread-count', default=config.DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
     parser.add_argument('-s', '--genome-size', dest='read_file',
