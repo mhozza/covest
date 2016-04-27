@@ -20,6 +20,7 @@ class BasicModel:
         self.defaults = (1, self._default_param(1))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
         self.hist = hist
+        self.tail = self.hist.pop('tail', 0)
         if max_error is None:
             self.max_error = self.k + 1
         else:
@@ -66,25 +67,22 @@ class BasicModel:
         # portion of kmers with s errors
         a_s = [n_s[s] / sum_n_s for s in range(self.max_error)]
         # probability that unique kmer has coverage j (j > 0)
-        max_hist = len(self.hist)
-        p_j = [None] + [
-            sum(
+        p_j = {
+            j: sum(
                 a_s[s] * tr_poisson(l_s[s], j) for s in range(self.max_error)
             )
-            for j in range(1, max_hist)
-        ]
+            for j in self.hist
+        }
         return p_j
 
     def compute_loglikelihood(self, *args):
         if not self.check_bounds(args):
             return -config.INF
         p_j = self.compute_probabilities(*args)
-        if config.ESTIMATE_TAIL:
-            sp_j = sum(p_j[1:-1])
-            p_j[-1] = 1 - sp_j
+        sp_j = sum(p_j.values())
         return float(sum(
-            self.hist[j] * safe_log(p_j[j]) for j in range(1, len(self.hist)) if self.hist[j]
-        ))
+            h * safe_log(p_j[j]) for j, h in self.hist.items() if h
+        )) + self.tail * safe_log(1 - sp_j)
 
     def compute_loglikelihood_multi(self, args_list, thread_count=config.DEFAULT_THREAD_COUNT):
         if thread_count is None:  # do not use multiprocessing
@@ -96,6 +94,7 @@ class BasicModel:
             tuple(args): likelihood for args, likelihood in zip(args_list, likelihoods)
         }
 
+    # @TODO: poriesit sparse histogramy
     def plot_probs(self, est, guess, orig, cumulative=False, log_scale=True):
         def fmt(p):
             return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20]]
@@ -109,8 +108,8 @@ class BasicModel:
             else:
                 return probs
 
-        hs = float(sum(self.hist))
-        hp = adjust_probs([f / hs for f in self.hist], hist=True)
+        hs = float(sum(self.hist.values()))
+        hp = adjust_probs({k: f / hs for k, f in self.hist.items()}, hist=True)
         ep = adjust_probs(self.compute_probabilities(*est))
         gp = adjust_probs(self.compute_probabilities(*guess))
         if orig is not None and None not in orig:
@@ -158,7 +157,7 @@ class RepeatsModel(BasicModel):
         self.threshold = threshold
 
     def get_hist_threshold(self, b_o, threshold):
-        hist_size = len(self.hist)
+        hist_size = max(self.hist)
         if threshold is not None:
             for o in range(1, hist_size):
                 if b_o(o) <= threshold:
@@ -207,11 +206,11 @@ class RepeatsModel(BasicModel):
             for o in range(1, threshold_o)
         ]
         # probability that unique kmer has coverage j (j > 0)
-        p_j = [None] + [
-            sum(
+        p_j = {
+            j: sum(
                 b_o(o) * sum(
                     a_os[o][s] * tr_poisson(o * l_s[s], j) for s in range(self.max_error)
                 ) for o in range(1, threshold_o)
-            ) for j in range(1, len(self.hist))
-        ]
+            ) for j in self.hist
+        }
         return p_j
