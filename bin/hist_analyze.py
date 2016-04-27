@@ -15,17 +15,13 @@ def relative_difference(a, b):
 def main(args):
     k, r = args.kmer_size, args.read_length
     hist_orig = load_histogram(args.input_histogram)
-    sample_factor = 1
-    hist, sample_factor = process_histogram(hist_orig, sample_factor=sample_factor)
-    c_start, _ = compute_coverage_apx(hist, k, r)
-    c = c_start
-    target_coverage = 12
-    while c > target_coverage:
+    hist, sample_factor = process_histogram(hist_orig)
+    c, _ = compute_coverage_apx(hist, k, r)
+    while c > config.AUTO_SAMPLE_TARGET_COVERAGE:
         sample_factor += 1
         hist, sample_factor = process_histogram(hist_orig, sample_factor=sample_factor)
         c, _ = compute_coverage_apx(hist, k, r)
-        print(c)
-    print('Suggested sf:', sample_factor)
+    print('Suggested sf:', sample_factor, 'target_coverage:', c, 'apx_coverage', c*sample_factor)
 
 
 if __name__ == '__main__':
@@ -36,5 +32,4 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--read-length', type=int,
                         default=config.DEFAULT_READ_LENGTH, help='Read length')
 
-    args = parser.parse_args()
-    main(args)
+    main(parser.parse_args())

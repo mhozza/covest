@@ -1,67 +1,16 @@
 import argparse
 import json
-from math import exp
 from multiprocessing import Pool
 
 from scipy.optimize import minimize
 
 from . import config
+from .data import count_reads_size, parse_data, print_output, load_histogram
 from .grid import initial_grid, optimize_grid
-from .inverse import inverse
-from .data import count_reads_size, process_histogram, parse_data, print_output, load_histogram
+from .histogram import process_histogram, compute_coverage_apx
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print
-
-
-def estimate_p(cc, alpha):
-    return (cc * (alpha - 1)) / (alpha * cc - alpha - cc)
-
-
-def kmer_to_read_coverage(coverage, k, r):
-    return coverage * r / (r - k + 1)
-
-
-def fix_coverage(coverage):
-    return inverse(lambda c: (c - c * exp(-c)) / (1 - exp(-c) - c * exp(-c)))(coverage)
-
-
-def compute_coverage_apx(hist, k, r):
-    hist = dict(hist)
-    tail = hist.pop('tail', 0)
-    hist[max(hist) + 1] = tail
-    observed_ones = hist.get(1, 0)
-    all_kmers = sum(i * h for i, h in hist.items())
-    total_unique_kmers = sum(h for h in hist.values())
-
-    if total_unique_kmers == 0:
-        return 0.0, 1.0
-
-    # discard first column
-    all_kmers -= observed_ones
-    unique_kmers = total_unique_kmers - observed_ones
-    # compute coverage from hist >=2
-    try:
-        cov = all_kmers / unique_kmers
-        cov = fix_coverage(cov)
-        # fix unique kmers
-        unique_kmers /= (1.0 - exp(-cov) - cov * exp(-cov))
-        # compute alpha (error read ratio)
-        estimated_ones = unique_kmers * cov * exp(-cov)
-        estimated_zeros = unique_kmers * exp(-cov)
-        error_ones = max(0.0, observed_ones - estimated_ones)
-        alpha = error_ones / (total_unique_kmers + estimated_zeros)
-        # estimate probability of correct kmer and error rate
-        estimated_p = max(0.0, estimate_p(cov, alpha))
-        e = 1 - estimated_p ** (1.0 / k)
-        # return corrected coverage and error estimate
-        if estimated_p > 0:
-            # function for conversion between kmer and base coverage
-            return float(kmer_to_read_coverage(cov / estimated_p, k, r)), float(e)
-        else:
-            return 0.0, float(e)
-    except ZeroDivisionError:
-        return 0.0, 1.0
 
 
 class CoverageEstimator:
@@ -147,7 +96,7 @@ def main(args):
     # Load histogram
     hist_orig = load_histogram(args.input_histogram)
     hist, sample_factor = process_histogram(
-        hist_orig, auto_trim=args.auto_trim,
+        hist_orig, args.kmer_size, args.read_length, auto_trim=args.auto_trim,
         trim=args.trim, auto_sample=args.auto_sample, sample_factor=args.sample_factor,
     )
     reads_size = None
@@ -242,9 +191,8 @@ def run():
                         help='Trim histogram automatically with this threshold')
     parser.add_argument('-sf', '--sample-factor', type=int,
                         help='Sample histogram with this factor')
-    parser.add_argument('-as', '--auto-sample', type=int, nargs='?',
-                        const=config.DEFAULT_SAMPLE_TARGET,
-                        help='Sample histogram automatically to this target size')
+    parser.add_argument('-as', '--auto-sample', action='store_true',
+                        help='Sample histogram automatically')
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
