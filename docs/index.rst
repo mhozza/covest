@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to covest's documentation!
-======================================
+==================================
 
 Contents:
 
@@ -12,8 +12,6 @@ Contents:
    :maxdepth: 2
 
    readme
-   installation
-   usage
    contributing
    authors
    history
