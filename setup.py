@@ -19,6 +19,7 @@ requirements = [
     'scipy<0.16',
     'pyfasta',
     'first',
+    'pyyaml',
 ]
 
 test_requirements = [
