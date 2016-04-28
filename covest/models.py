@@ -4,7 +4,7 @@ import multiprocessing
 import sys
 from covest_poisson import truncated_poisson as tr_poisson
 from functools import lru_cache
-from math import exp
+from math import exp, fsum
 
 import matplotlib.pyplot as plt
 from scipy.misc import comb
@@ -20,7 +20,7 @@ class BasicModel:
         self.k = k
         self.r = r
         self.params = ('coverage', 'error_rate')
-        self.bounds = ((0.01, max_cov), (0.0, 0.5))
+        self.bounds = ((0.01, max_cov), (0, 0.5))
         self.defaults = (1, self._default_param(1))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
         self.hist = hist
@@ -57,6 +57,17 @@ class BasicModel:
                 return False
         return True
 
+    def fit_to_bounds(self, args):
+        args = list(args)
+        for i, (arg, (l, r)) in enumerate(zip(args, self.bounds)):
+            if arg is None:
+                continue
+            if (l is not None and arg < l):
+                args[i] = l
+            elif (r is not None and arg > r):
+                args[i] = r
+        return args
+
     def correct_c(self, c):
         return c * (self.r - self.k + 1) / self.r
 
@@ -87,13 +98,13 @@ class BasicModel:
         return p_j
 
     def compute_loglikelihood(self, *args):
-        if not self.check_bounds(args):
-            return -constants.INF
+        args = self.fit_to_bounds(args)
         p_j = self.compute_probabilities(*args)
-        sp_j = sum(p_j.values())
+        sp_j = min(1, fsum(p_j.values()))
+        tail = self.tail * safe_log(1 - sp_j) if sp_j < 1 else 0
         return float(sum(
             h * safe_log(p_j[j]) for j, h in self.hist.items() if h
-        )) + self.tail * safe_log(1 - sp_j)
+        )) + tail
 
     def compute_loglikelihood_multi(self, args_list, thread_count=constants.DEFAULT_THREAD_COUNT):
         if thread_count is None:  # do not use multiprocessing
@@ -165,8 +176,7 @@ class RepeatsModel(BasicModel):
         super(RepeatsModel, self).__init__(k, r, hist, tail, max_error=max_error)
         self.repeats = True
         self.params = self.params + ('q1', 'q2', 'q')
-        self.bounds = (
-            (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 0.9999), (0.0, 0.99), (0.0, 0.99))
+        self.bounds = self.bounds +  ((min_single_copy_ratio, 1), (0, 1), (0, 1))
         self.defaults = self.defaults + tuple(
             self._default_param(i, default=0.5) for i in range(2, 5)
         )

@@ -14,6 +14,9 @@ class TestCovest(unittest.TestCase):
         self.assertEqual(select_model('b'), BasicModel)
         self.assertEqual(select_model('r'), RepeatsModel)
 
+    def test_model_selection_invalid(self):
+        with self.assertRaises(ValueError):
+            select_model('someInvalidModel')
 
 if __name__ == '__main__':
     import sys
