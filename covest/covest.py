@@ -3,7 +3,7 @@ from multiprocessing import Pool
 
 from scipy.optimize import minimize
 
-from . import config
+from . import constants
 from .data import count_reads_size, parse_data, print_output, load_histogram
 from .grid import initial_grid, optimize_grid
 from .histogram import process_histogram
@@ -44,7 +44,7 @@ class CoverageEstimator:
     def _optimize(self, r):
         return minimize(
             self.likelihood_f, r,
-            method=config.OPTIMIZATION_METHOD,
+            method=constants.OPTIMIZATION_METHOD,
             bounds=self.bounds,
             options={'disp': False}
         )
@@ -53,7 +53,7 @@ class CoverageEstimator:
             self,
             guess,
             grid_search_type=GRID_SEARCH_TYPE_PRE,
-            n_threads=config.DEFAULT_THREAD_COUNT,
+        n_threads=constants.DEFAULT_THREAD_COUNT,
     ):
         r = list(guess)
         r[1] *= self.err_scale
@@ -174,7 +174,7 @@ def main(args):
         # Draw plot
         if args.plot is not None:
             model.plot_probs(
-                res, guess, orig, cumulative=args.plot, log_scale=config.PLOT_LOG_SCALE
+                res, guess, orig, cumulative=args.plot, log_scale=constants.PLOT_LOG_SCALE
             )
 
 
@@ -183,9 +183,9 @@ def run():
     parser.add_argument('input_histogram', type=str, help='Input histogram')
     parser.add_argument('--load', type=str, help='Load json')
     parser.add_argument('-k', '--kmer-size', type=int,
-                        default=config.DEFAULT_K, help='Kmer size')
+                        default=constants.DEFAULT_K, help='Kmer size')
     parser.add_argument('-r', '--read-length', type=int,
-                        default=config.DEFAULT_READ_LENGTH, help='Read length')
+                        default=constants.DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('--plot', type=bool, nargs='?', const=False,
                         help='Plot probabilities (use --plot 1 to plot probs * j)')
     parser.add_argument('-m', '--model', type=str, default='basic',
@@ -201,11 +201,11 @@ def run():
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
-    parser.add_argument('-es', '--error-scale', type=float, default=config.DEFAULT_ERR_SCALE,
+    parser.add_argument('-es', '--error-scale', type=float, default=constants.DEFAULT_ERR_SCALE,
                         help='Error scale')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
     parser.add_argument('-q1', type=float, help='q1')
-    parser.add_argument('-mq1', '--min-q1', type=float, default=config.DEFAULT_MIN_SINGLECOPY_RATIO,
+    parser.add_argument('-mq1', '--min-q1', type=float, default=constants.DEFAULT_MIN_SINGLECOPY_RATIO,
                         help='minimum single copy ratio')
     parser.add_argument('-q2', type=float, help='q2')
     parser.add_argument('-q', type=float, help='q')
@@ -213,7 +213,7 @@ def run():
                         help='Start form given values')
     parser.add_argument('-f', '--fix', action='store_true',
                         help='Fix some params, optimize others')
-    parser.add_argument('-T', '--thread-count', default=config.DEFAULT_THREAD_COUNT, type=int,
+    parser.add_argument('-T', '--thread-count', default=constants.DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
     parser.add_argument('-s', '--genome-size', dest='read_file',
                         help='Calculate genome size from reads')

@@ -5,7 +5,7 @@ from math import exp, floor, ceil
 
 from scipy.stats import binom
 
-from covest import config
+from covest import constants
 from .utils import estimate_p, kmer_to_read_coverage, fix_coverage, verbose_print
 
 
@@ -78,7 +78,7 @@ def auto_sample_hist(hist, k, r, trim=None):
     h = dict(hist)
     f = 1
     c, e = compute_coverage_apx(hist, k, r)
-    while c > config.AUTO_SAMPLE_TARGET_COVERAGE:
+    while c > constants.AUTO_SAMPLE_TARGET_COVERAGE:
         f += 1
         h = sample_histogram(hist, factor=f, trim=trim)
         c, e = compute_coverage_apx(h, k, r)
@@ -87,7 +87,7 @@ def auto_sample_hist(hist, k, r, trim=None):
 
 def remove_noise(hist):
     total = sum(hist.values())
-    hist_denoised = {k: v for k, v in hist.items() if v/total > config.NOISE_THRESHOLD}
+    hist_denoised = {k: v for k, v in hist.items() if v / total > constants.NOISE_THRESHOLD}
     return hist_denoised
 
 
@@ -99,7 +99,7 @@ def get_trim(hist):
     for i, h in sorted(hist.items()):
         s += h
         r = s / ss
-        r = round(r, config.AUTO_TRIM_PRECISION)
+        r = round(r, constants.AUTO_TRIM_PRECISION)
         if r == 1:
             trim = i
             break

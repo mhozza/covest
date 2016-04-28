@@ -3,7 +3,7 @@ import pickle
 import random
 from multiprocessing import Pool
 
-from . import config
+from . import constants
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print
 
@@ -16,7 +16,7 @@ def unpack_call(args):
 
 @running_time_decorator
 def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
-                  n_threads=config.DEFAULT_THREAD_COUNT):
+                  n_threads=constants.DEFAULT_THREAD_COUNT):
     def generate_grid(args, step, max_depth):
         def generate_grid_single(var, fix=None):
             if fix is None:
@@ -48,8 +48,8 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     f = pickle.dumps(fn, pickle.HIGHEST_PROTOCOL)
     min_val = sgn * unpack_call([f, initial_guess])
     min_args = initial_guess
-    step = config.STEP
-    grid_depth = config.GRID_DEPTH
+    step = constants.STEP
+    grid_depth = constants.GRID_DEPTH
     diff = 1
     n_iter = 0
     try:
@@ -79,7 +79,7 @@ def optimize_grid(fn, initial_guess, bounds=None, maximize=False, fix=None,
     return min_args
 
 
-def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fix=None, ):
+def initial_grid(initial_guess, count=constants.INITIAL_GRID_COUNT, bounds=None, fix=None, ):
     def generate_grid(step):
         def apply_bounds(interval, i):
             if bounds is None or len(bounds) <= i or len(bounds[i]) != 2:
@@ -111,4 +111,4 @@ def initial_grid(initial_guess, count=config.INITIAL_GRID_COUNT, bounds=None, fi
 
     if fix is None:
         fix = [None] * len(initial_guess)
-    return list(generate_grid(config.INITIAL_GRID_STEP))
+    return list(generate_grid(constants.INITIAL_GRID_STEP))

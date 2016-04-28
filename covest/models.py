@@ -9,7 +9,7 @@ from math import exp
 import matplotlib.pyplot as plt
 from scipy.misc import comb
 
-from covest import config
+from covest import constants
 from covest.utils import safe_log, fix_zero
 
 MODEL_CLASS_SUFFIX = 'Model'
@@ -88,14 +88,14 @@ class BasicModel:
 
     def compute_loglikelihood(self, *args):
         if not self.check_bounds(args):
-            return -config.INF
+            return -constants.INF
         p_j = self.compute_probabilities(*args)
         sp_j = sum(p_j.values())
         return float(sum(
             h * safe_log(p_j[j]) for j, h in self.hist.items() if h
         )) + self.tail * safe_log(1 - sp_j)
 
-    def compute_loglikelihood_multi(self, args_list, thread_count=config.DEFAULT_THREAD_COUNT):
+    def compute_loglikelihood_multi(self, args_list, thread_count=constants.DEFAULT_THREAD_COUNT):
         if thread_count is None:  # do not use multiprocessing
             likelihoods = itertools.starmap(self.compute_loglikelihood, args_list)
         else:
@@ -234,6 +234,6 @@ class RepeatsModel(BasicModel):
 
 models = {
     cls.short_name(): cls for _, cls in inspect.getmembers(
-    sys.modules[__name__], predicate=lambda x: inspect.isclass(x) and x.__name__.endswith(MODEL_CLASS_SUFFIX)
-)
-    }
+        sys.modules[__name__], predicate=lambda x: inspect.isclass(x) and x.__name__.endswith(MODEL_CLASS_SUFFIX)
+    )
+}
