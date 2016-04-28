@@ -1,5 +1,4 @@
 import argparse
-import json
 from multiprocessing import Pool
 
 from scipy.optimize import minimize
@@ -11,7 +10,6 @@ from .histogram import process_histogram
 from .models import BasicModel, RepeatsModel
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print
-
 
 MODEL_OPTIONS = {
     'simple': BasicModel,
@@ -144,7 +142,7 @@ def main(args):
     else:
         if args.load:  # Load saved data, don't estimate anything
             with open(args.load) as f:
-                parsed_data = parse_data(json.load(f))
+                parsed_data = parse_data(f)
                 guess = parsed_data.guess
                 res = parsed_data.estimated
         else:

@@ -1,7 +1,8 @@
-import json
 from collections import namedtuple
 from functools import lru_cache
 from os import path
+
+import yaml
 
 from .utils import safe_int, verbose_print
 
@@ -42,7 +43,8 @@ def count_reads_size(fname):
         verbose_print(e)
 
 
-def parse_data(data):
+def parse_data(f):
+    data = yaml.load(f)
     model_class_name = data['model']
 
     guess = list()
@@ -92,12 +94,12 @@ def print_output(
 
     if estimated is not None:
         output_data['estimated_loglikelihood'] = model.compute_loglikelihood(*estimated)
-        output_data['estimated_coverage'] = estimated[0] * sample_factor
-        output_data['estimated_error_rate'] = estimated[1]
+        output_data['estimated_coverage'] = float(estimated[0] * sample_factor)
+        output_data['estimated_error_rate'] = float(estimated[1])
         if model.repeats:
-            output_data['estimated_q1'] = estimated[2]
-            output_data['estimated_q2'] = estimated[3]
-            output_data['estimated_q'] = estimated[4]
+            output_data['estimated_q1'] = float(estimated[2])
+            output_data['estimated_q2'] = float(estimated[3])
+            output_data['estimated_q'] = float(estimated[4])
             if orig_q1 is None:
                 orig_q1 = estimated[2]
             if orig_q2 is None:
@@ -135,8 +137,9 @@ def print_output(
     output_data['sample_factor'] = sample_factor
 
     if not silent:
-        print(json.dumps(
-            output_data, sort_keys=True, indent=4, separators=(',', ': ')
-        ))
+        # print(json.dumps(
+        #     output_data, sort_keys=True, indent=4, separators=(',', ': ')
+        # ))
+        print(yaml.dump(output_data, indent=4, default_flow_style=False))
 
     return output_data
