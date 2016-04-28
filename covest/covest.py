@@ -23,10 +23,6 @@ def select_model(m):
 
 
 class CoverageEstimator:
-    GRID_SEARCH_TYPE_NONE = 0
-    GRID_SEARCH_TYPE_PRE = 1
-    GRID_SEARCH_TYPE_POST = 2
-
     def __init__(self, model, err_scale=1, fix=None):
         self.model = model
         self.fix = fix
@@ -52,7 +48,8 @@ class CoverageEstimator:
     def compute_coverage(
         self,
         guess,
-        grid_search_type=GRID_SEARCH_TYPE_PRE,
+        starting_points=1,
+        use_grid_search=False,
         n_threads=constants.DEFAULT_THREAD_COUNT,
     ):
         r = list(guess)
@@ -60,7 +57,7 @@ class CoverageEstimator:
         success = True
         try:
             verbose_print('Bounds: {}'.format(self.bounds))
-            if grid_search_type == self.GRID_SEARCH_TYPE_NONE:
+            if starting_points == 1:
                 with running_time('First optimization'):
                     res = self._optimize(r)
                     success = res.success
@@ -70,8 +67,8 @@ class CoverageEstimator:
                             'Initial params:{}\nResult{}'.format(r, res)
                         )
                     r = res.x
-            else:
-                params = initial_grid(r, bounds=self.bounds)
+            elif starting_points > 1:
+                params = initial_grid(r, count=starting_points, bounds=self.bounds)
                 with running_time('Initial grid optimization'):
                     min_r = None
                     with Pool(n_threads) as pool:
@@ -87,7 +84,11 @@ class CoverageEstimator:
                                 )
                             r = res.x
 
-            if grid_search_type == self.GRID_SEARCH_TYPE_POST and not success:
+            # If use_grid_search is none, run grid search only on failure
+            if use_grid_search is None and not success:
+                use_grid_search = True
+
+            if use_grid_search:
                 verbose_print('Starting grid search with guess: {}'.format(r))
                 r = optimize_grid(
                     self.likelihood_f, r, bounds=self.bounds,
@@ -163,7 +164,8 @@ def main(args):
             estimator = CoverageEstimator(model, err_scale=err_scale, fix=fix)
             res, success = estimator.compute_coverage(
                 guess,
-                grid_search_type=args.grid,
+                starting_points=args.starting_points,
+                use_grid_search=args.grid,
                 n_threads=args.thread_count,
             )
 
@@ -191,6 +193,8 @@ def run():
                         default=constants.DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('-s', '--genome-size', dest='read_file',
                         help='Calculate genome size from reads')
+    parser.add_argument('-sp', '--starting-points', type=int, default=1,
+                        help='Number of point to start optimization from.')
     parser.add_argument('-T', '--thread-count', default=constants.DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
     parser.add_argument('--plot', type=bool, nargs='?', const=False,
@@ -201,8 +205,8 @@ def run():
     parser.add_argument('-sf', '--sample-factor', type=int, default=None,
                         help='Use fixed sample factor for histogram sampling instead of automatic.'
                              ' Set to 1 to not sample at all.')
-    parser.add_argument('-g', '--grid', type=int, default=0,
-                        help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
+    parser.add_argument('-g', '--grid', action='store_true', default=False,
+                        help='Use grid search for fine-tuning.')
     parser.add_argument('-f', '--fix', action='store_true',
                         help='Fix some params, optimize others')
     parser.add_argument('-c', '--coverage', type=float, help='Coverage')
@@ -217,7 +221,7 @@ def run():
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood from provided values')
     parser.add_argument('-so', '--start-original', action='store_true',
-                        help='Start form given values')
+                        help='Start optimization form provided values')
 
     main(parser.parse_args())
 
