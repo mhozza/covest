@@ -7,19 +7,9 @@ from . import constants
 from .data import count_reads_size, parse_data, print_output, load_histogram
 from .grid import initial_grid, optimize_grid
 from .histogram import process_histogram
-from .models import models
+from .models import select_model, models
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print, nonefloat
-
-
-def select_model(m):
-    if m in models:
-        return models[m]
-    else:
-        for k, model in models.items():
-            if k.startswith(m):
-                return model
-    raise ValueError('Not such model: {}.'.format(m))
 
 
 class CoverageEstimator:

@@ -237,3 +237,13 @@ models = {
         sys.modules[__name__], predicate=lambda x: inspect.isclass(x) and x.__name__.endswith(MODEL_CLASS_SUFFIX)
     )
 }
+
+
+def select_model(m):
+    if m in models:
+        return models[m]
+    else:
+        for k, model in models.items():
+            if k.startswith(m):
+                return model
+    raise ValueError('Not such model: {}.'.format(m))
