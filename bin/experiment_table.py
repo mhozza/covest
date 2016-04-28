@@ -55,34 +55,34 @@ def main(args):
 
     header = [
         'seq_name',
-        'original_coverage', 'original_error_rate', 'original_k',
-        'estimated_coverage', 'estimated_error_rate',
-        'estimated_genome_size',
-        'estimated_q1', 'estimated_q2', 'estimated_q',
+        'provided_coverage', 'provided_error_rate', 'provided_k',
+        'coverage', 'error_rate',
+        'genome_size',
+        'q1', 'q2', 'q',
         'guessed_coverage', 'guessed_error_rate',
-        'original_loglikelihood', 'estimated_loglikelihood', 'guessed_loglikelihood',
+        'provided_loglikelihood', 'loglikelihood', 'guessed_loglikelihood',
     ]
 
     header_avg = [
-        'original_coverage',
-        'original_error_rate',
-        'original_k',
-        'estimated_coverage', 'estimated_coverage_std',
-        'estimated_error_rate', 'estimated_error_rate_std',
-        'estimated_genome_size', 'estimated_genome_size_std',
-        'estimated_q1', 'estimated_q1_std',
-        'estimated_q2', 'estimated_q2_std',
-        'estimated_q', 'estimated_q_std',
+        'provided_coverage',
+        'provided_error_rate',
+        'provided_k',
+        'coverage', 'coverage_std',
+        'error_rate', 'error_rate_std',
+        'genome_size', 'genome_size_std',
+        'q1', 'q1_std',
+        'q2', 'q2_std',
+        'q', 'q_std',
         'guessed_coverage', 'guessed_coverage_std',
         'guessed_error_rate', 'guessed_error_rate_std',
-        'original_loglikelihood', 'original_loglikelihood_std',
-        'estimated_loglikelihood', 'estimated_loglikelihood_std',
+        'provided_loglikelihood', 'provided_loglikelihood_std',
+        'loglikelihood', 'loglikelihood_std',
         'guessed_loglikelihood', 'guessed_loglikelihood_std',
     ]
 
     # header = [
-    #     'original_coverage', 'original_error_rate',
-    #     'estimated_coverage', 'estimated_error_rate',
+    #     'provided_coverage', 'provided_error_rate',
+    #     'coverage', 'error_rate',
     # ]
 
     format_templates = {
@@ -96,14 +96,14 @@ def main(args):
     }
 
     titles = {
-        'original_coverage': 'Coverage',
-        'original_error_rate': 'Error Rate',
-        'estimated_coverage': 'Est. Coverage',
-        'estimated_coverage_std': 'Est. Coverage Std',
-        'estimated_error_rate': 'Est. Error Rate',
-        'estimated_error_rate_std': 'Est. Error Rate Std',
-        'estimated_genome_size': 'Est. Genome Size',
-        'estimated_genome_size_std': 'Est. Genome Size Std',
+        'provided_coverage': 'Coverage',
+        'provided_error_rate': 'Error Rate',
+        'coverage': 'Est. Coverage',
+        'coverage_std': 'Est. Coverage Std',
+        'error_rate': 'Est. Error Rate',
+        'error_rate_std': 'Est. Error Rate Std',
+        'genome_size': 'Est. Genome Size',
+        'genome_size_std': 'Est. Genome Size Std',
     }
 
     if args.average:
@@ -116,9 +116,9 @@ def main(args):
         sorted(
             list(table_lines.values()),
             key=lambda x: (
-                x['original_coverage'],
-                x['original_error_rate'],
-                x['original_k'],
+                x['provided_coverage'],
+                x['provided_error_rate'],
+                x['provided_k'],
                 x.get('repeats', False),
                 x['seq_name'],
             )
