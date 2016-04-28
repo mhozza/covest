@@ -44,3 +44,10 @@ def kmer_to_read_coverage(coverage, k, r):
 
 def fix_coverage(coverage):
     return inverse(lambda c: (c - c * exp(-c)) / (1 - exp(-c) - c * exp(-c)))(coverage)
+
+
+def nonefloat(x):
+    try:
+        return float(x)
+    except ValueError:
+        return None

@@ -9,7 +9,7 @@ from .grid import initial_grid, optimize_grid
 from .histogram import process_histogram
 from .models import models
 from .perf import running_time, running_time_decorator
-from .utils import verbose_print
+from .utils import verbose_print, nonefloat
 
 
 def select_model(m):
@@ -50,9 +50,9 @@ class CoverageEstimator:
         )
 
     def compute_coverage(
-            self,
-            guess,
-            grid_search_type=GRID_SEARCH_TYPE_PRE,
+        self,
+        guess,
+        grid_search_type=GRID_SEARCH_TYPE_PRE,
         n_threads=constants.DEFAULT_THREAD_COUNT,
     ):
         r = list(guess)
@@ -124,11 +124,13 @@ def main(args):
     # Model initialisation
     model = select_model(args.model)(
         args.kmer_size, args.read_length, hist, tail,
-        max_error=8, max_cov=args.max_coverage,
+        max_error=constants.MAX_ERRORS, max_cov=args.max_coverage,
         min_single_copy_ratio=args.min_q1,
     )
 
-    orig = (args.coverage, args.error_rate, args.q1, args.q2, args.q)[:model.param_count]
+    orig = [None]*model.param_count
+    for i, v in zip(range(model.param_count), (args.coverage, args.error_rate) + tuple(args.params)):
+        orig[i] = v
     fix = orig if args.fix else None
 
     if args.ll_only:
@@ -181,18 +183,19 @@ def main(args):
 def run():
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
     parser.add_argument('input_histogram', type=str, help='Input histogram')
-    parser.add_argument('--load', type=str, help='Load json')
+    parser.add_argument('-m', '--model', type=str, default='basic',
+                        help='Select models for estimation. Options: {}'.format(list(models.keys())))
     parser.add_argument('-k', '--kmer-size', type=int,
                         default=constants.DEFAULT_K, help='Kmer size')
     parser.add_argument('-r', '--read-length', type=int,
                         default=constants.DEFAULT_READ_LENGTH, help='Read length')
+    parser.add_argument('-s', '--genome-size', dest='read_file',
+                        help='Calculate genome size from reads')
+    parser.add_argument('-T', '--thread-count', default=constants.DEFAULT_THREAD_COUNT, type=int,
+                        help='Thread count')
     parser.add_argument('--plot', type=bool, nargs='?', const=False,
                         help='Plot probabilities (use --plot 1 to plot probs * j)')
-    parser.add_argument('-m', '--model', type=str, default='basic',
-                        help='Select models for estimation. Options: {}'.format(list(models.keys())))
-    parser.add_argument('-ll', '--ll-only', action='store_true',
-                        help='Only compute log likelihood')
-    parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
+    parser.add_argument('--load', type=str, help='Load json')
     parser.add_argument('-t', '--trim', type=int, default=None,
                         help='Trim histogram at this value. Set to 0 to disable automatic trimming.')
     parser.add_argument('-sf', '--sample-factor', type=int, default=None,
@@ -200,23 +203,21 @@ def run():
                              ' Set to 1 to not sample at all.')
     parser.add_argument('-g', '--grid', type=int, default=0,
                         help='Grid search type: 0 - None, 1 - Pre-grid, 2 - Post-grid')
+    parser.add_argument('-f', '--fix', action='store_true',
+                        help='Fix some params, optimize others')
+    parser.add_argument('-c', '--coverage', type=float, help='Coverage')
+    parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-es', '--error-scale', type=float, default=constants.DEFAULT_ERR_SCALE,
                         help='Error scale')
-    parser.add_argument('-c', '--coverage', type=float, help='Coverage')
-    parser.add_argument('-q1', type=float, help='q1')
     parser.add_argument('-mq1', '--min-q1', type=float, default=constants.DEFAULT_MIN_SINGLECOPY_RATIO,
                         help='minimum single copy ratio')
-    parser.add_argument('-q2', type=float, help='q2')
-    parser.add_argument('-q', type=float, help='q')
+    parser.add_argument('-p', '--params', type=nonefloat, nargs='*', default=tuple(),
+                        help='Additional model parameters.')
+    parser.add_argument('-ll', '--ll-only', action='store_true',
+                        help='Only compute log likelihood from provided values')
     parser.add_argument('-so', '--start-original', action='store_true',
                         help='Start form given values')
-    parser.add_argument('-f', '--fix', action='store_true',
-                        help='Fix some params, optimize others')
-    parser.add_argument('-T', '--thread-count', default=constants.DEFAULT_THREAD_COUNT, type=int,
-                        help='Thread count')
-    parser.add_argument('-s', '--genome-size', dest='read_file',
-                        help='Calculate genome size from reads')
 
     main(parser.parse_args())
 
