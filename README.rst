@@ -32,25 +32,28 @@ type ``covest --help`` for the usage.
 Basic Usage:
 ~~~~~~~~~~~~
 ``covest histogram -m model -k K -r read_length``
-- You can specify the read file using ``-s reads.fa`` parameter for more precise genome size computation.
-- default *K* is 21
-- default *read length* is 100
-- currently, the supported models are:
 
-    - basic: for simple genomes without repeats
-    - repeat: for genomes with repetitive sequences
+-  You can specify the read file using ``-s reads.fa`` parameter for more precise genome size computation.
+-  default *K* is 21
+-  default *read length* is 100
+-  currently, the supported models are:
+
+   -  basic: for simple genomes without repeats
+   -  repeat: for genomes with repetitive sequences
 
 Input Histogram Specification:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The input histogram can be generated from the read data using `jellyfish <http://www.cbcb.umd.edu/software/jellyfish/>`__.
-``jellyfish count -m K -C reads.fa -o table.jf``
-``jellyfish histo table.jf -o reads.hist``
+
+-  ``jellyfish count -m K -C reads.fa -o table.jf``
+-  ``jellyfish histo table.jf -o reads.hist``
 
 The format of the histogram is just list of lines. Each lines contains an index and value separated by space.
 
 Output Specification:
 ~~~~~~~~~~~~~~~~~~~~~
 CovEst outputs it's results in simple subset of YAML format for best human readability and possibility of machine processing.
+
 The output are lines containing ``key: value``. The most important keys are ``coverage`` and ``genome_size`` (or ``genome_size_reads`` if read file was specified).
 
 Other included tools
