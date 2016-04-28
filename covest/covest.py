@@ -7,21 +7,16 @@ from . import config
 from .data import count_reads_size, parse_data, print_output, load_histogram
 from .grid import initial_grid, optimize_grid
 from .histogram import process_histogram
-from .models import BasicModel, RepeatsModel
+from .models import models
 from .perf import running_time, running_time_decorator
 from .utils import verbose_print
 
-MODEL_OPTIONS = {
-    'simple': BasicModel,
-    'repeat': RepeatsModel,
-}
-
 
 def select_model(m):
-    if m in MODEL_OPTIONS:
-        return MODEL_OPTIONS[m]
+    if m in models:
+        return models[m]
     else:
-        for k, model in MODEL_OPTIONS.items():
+        for k, model in models.items():
             if k.startswith(m):
                 return model
     raise ValueError('Not such model: {}.'.format(m))
@@ -100,9 +95,9 @@ class CoverageEstimator:
                 )
         except KeyboardInterrupt:
             pass
-        verbose_print('Status: %s' % ('success' if success else 'failure',))
+        verbose_print('Estimation finished with status: %s.' % ('success' if success else 'failure',))
         r[1] /= self.err_scale
-        return r
+        return r, success
 
 
 @running_time_decorator
@@ -164,17 +159,16 @@ def main(args):
 
             # Estimate coverage
             estimator = CoverageEstimator(model, err_scale=err_scale, fix=fix)
-            res = estimator.compute_coverage(
+            res, success = estimator.compute_coverage(
                 guess,
                 grid_search_type=args.grid,
                 n_threads=args.thread_count,
             )
 
             print_output(
-                hist_orig,
-                model,
-                res, guess, args.coverage, args.error_rate, args.q1, args.q2, args.q,
-                sample_factor=sample_factor, reads_size=reads_size,
+                hist_orig, model, success, sample_factor,
+                res, guess, orig,
+                reads_size=reads_size,
             )
 
         # Draw plot
@@ -194,8 +188,8 @@ def run():
                         default=config.DEFAULT_READ_LENGTH, help='Read length')
     parser.add_argument('--plot', type=bool, nargs='?', const=False,
                         help='Plot probabilities (use --plot 1 to plot probs * j)')
-    parser.add_argument('-m', '--model', type=str, default='simple',
-                        help='Select models for estimation. Options: {}'.format(list(MODEL_OPTIONS.keys())))
+    parser.add_argument('-m', '--model', type=str, default='basic',
+                        help='Select models for estimation. Options: {}'.format(list(models.keys())))
     parser.add_argument('-ll', '--ll-only', action='store_true',
                         help='Only compute log likelihood')
     parser.add_argument('-M', '--max-coverage', type=int, help='Upper coverage limit')

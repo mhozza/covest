@@ -18,6 +18,7 @@ requirements = [
     'pystache',
     'scipy<0.16',
     'pyfasta',
+    'first',
 ]
 
 test_requirements = [

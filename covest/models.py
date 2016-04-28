@@ -1,21 +1,25 @@
+import inspect
 import itertools
 import multiprocessing
+import sys
+from covest_poisson import truncated_poisson as tr_poisson
 from functools import lru_cache
 from math import exp
 
 import matplotlib.pyplot as plt
-from covest_poisson import truncated_poisson as tr_poisson
 from scipy.misc import comb
 
 from covest import config
 from covest.utils import safe_log, fix_zero
 
+MODEL_CLASS_SUFFIX = 'Model'
 
 class BasicModel:
     def __init__(self, k, r, hist, tail, max_error=None, max_cov=None, *args, **kwargs):
         self.repeats = False
         self.k = k
         self.r = r
+        self.params = ('coverage', 'error_rate')
         self.bounds = ((0.01, max_cov), (0.0, 0.5))
         self.defaults = (1, self._default_param(1))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
@@ -26,9 +30,16 @@ class BasicModel:
         else:
             self.max_error = min(self.k + 1, max_error)
 
+    @classmethod
+    def short_name(cls):
+        name = cls.__name__
+        if name.endswith(MODEL_CLASS_SUFFIX):
+            name = name[:-len(MODEL_CLASS_SUFFIX)]
+        return name.lower()
+
     @property
     def param_count(self):
-        return len(self.bounds)
+        return len(self.params)
 
     def _default_param(self, i, default=None):
         l, r = self.bounds[i]
@@ -94,7 +105,6 @@ class BasicModel:
             tuple(args): likelihood for args, likelihood in zip(args_list, likelihoods)
         }
 
-    # @TODO: poriesit sparse histogramy
     def plot_probs(self, est, guess, orig, cumulative=False, log_scale=True):
         def fmt(p):
             return ['{:.3f}'.format(x) if x is not None else 'None' for x in p[:20]]
@@ -154,6 +164,7 @@ class RepeatsModel(BasicModel):
                  min_single_copy_ratio=0.3, *args, **kwargs):
         super(RepeatsModel, self).__init__(k, r, hist, tail, max_error=max_error)
         self.repeats = True
+        self.params = self.params + ('q1', 'q2', 'q')
         self.bounds = (
             (0.01, max_cov), (0.0, 0.5), (min_single_copy_ratio, 0.9999), (0.0, 0.99), (0.0, 0.99))
         self.defaults = self.defaults + tuple(
@@ -219,3 +230,10 @@ class RepeatsModel(BasicModel):
             ) for j in self.hist
         }
         return p_j
+
+
+models = {
+    cls.short_name(): cls for _, cls in inspect.getmembers(
+    sys.modules[__name__], predicate=lambda x: inspect.isclass(x) and x.__name__.endswith(MODEL_CLASS_SUFFIX)
+)
+    }

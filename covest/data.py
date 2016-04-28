@@ -3,7 +3,9 @@ from functools import lru_cache
 from os import path
 
 import yaml
+from first import first
 
+from .models import models, BasicModel
 from .utils import safe_int, verbose_print
 
 
@@ -45,101 +47,85 @@ def count_reads_size(fname):
 
 def parse_data(f):
     data = yaml.load(f)
-    model_class_name = data['model']
+    try:
+        model_class_name = data['model']
+        model = first(models.values(), key=lambda x: x.__name__ == model_class_name)
+    except KeyError:
+        model = BasicModel
+    guess = [
+        data.get('guessed_coverage', None),
+        data.get('guessed_error_rate', None),
+    ]
+    estimated = [data.get(k, None) for k in model.params]
+    return namedtuple('ParsedData', ('estimated', 'guess', 'model'))(estimated=estimated, guess=guess, model=model)
 
-    guess = list()
-    guess.append(data.get('guessed_coverage', None))
-    guess.append(data.get('guessed_error_rate', None))
-    if model_class_name == 'RepeatsModel':
-        guess.append(data.get('guessed_q1', None))
-        guess.append(data.get('guessed_q2', None))
-        guess.append(data.get('guessed_q', None))
 
-    estimated = list()
-    estimated.append(data.get('estimated_coverage', None))
-    estimated.append(data.get('estimated_error_rate', None))
-    if model_class_name == 'RepeatsModel':
-        estimated.append(data.get('estimated_q1', None))
-        estimated.append(data.get('estimated_q2', None))
-        estimated.append(data.get('estimated_q', None))
-
-    return namedtuple('ParsedData', ('estimated', 'guess'))(estimated=estimated, guess=guess)
-
+def replace_none(dest, src):
+    if dest is None or src is None:
+        raise ValueError('Invalid arguments.')
+    dest = list(dest)
+    if len(dest) != len(src):
+        raise ValueError('Length of arguments should be equal.')
+    for i in range(len(dest)):
+        if dest[i] is None:
+            dest[i] = src[i]
+    return dest
 
 def print_output(
     hist_orig,
     model,
+    success,
+    sample_factor,
     estimated=None,
     guess=None,
-    orig_coverage=None,
-    orig_error_rate=None,
-    orig_q1=None,
-    orig_q2=None,
-    orig_q=None,
-    sample_factor=None,
-    silent=False,
+    orig=None,
     reads_size=None,
+    silent=False,
 ):
-    output_data = dict()
-    output_data['model'] = model.__class__.__name__
+    def params_to_dict(names, values):
+        nonlocal sample_factor
+        if values is None or names is None:
+            return dict()
+        values = [float(v) if v is not None else v for v in values]
+        # apply sample factor to coverage
+        if values[0] is not None and sample_factor is not None:
+            values[0] *= sample_factor
+        data = dict()
+        for k, v in zip(names, values):
+            if v is not None:
+                data[k] = v
+        return data
+
+    output_data = {
+        'model': model.short_name(),
+        'hist_size': max(model.hist),
+        'sample_factor': sample_factor,
+        'success': success,
+    }
 
     if guess is not None:
+        output_data.update(params_to_dict(('guessed_coverage', 'guessed_error_rate'), guess))
         output_data['guessed_loglikelihood'] = model.compute_loglikelihood(*guess)
-        output_data['guessed_coverage'] = guess[0] * sample_factor
-        output_data['guessed_error_rate'] = guess[1]
-        if model.repeats:
-            output_data['guessed_q1'] = guess[2]
-            output_data['guessed_q2'] = guess[3]
-            output_data['guessed_q'] = guess[4]
-
     if estimated is not None:
-        output_data['estimated_loglikelihood'] = model.compute_loglikelihood(*estimated)
-        output_data['estimated_coverage'] = float(estimated[0] * sample_factor)
-        output_data['estimated_error_rate'] = float(estimated[1])
-        if model.repeats:
-            output_data['estimated_q1'] = float(estimated[2])
-            output_data['estimated_q2'] = float(estimated[3])
-            output_data['estimated_q'] = float(estimated[4])
-            if orig_q1 is None:
-                orig_q1 = estimated[2]
-            if orig_q2 is None:
-                orig_q2 = estimated[3]
-            if orig_q is None:
-                orig_q = estimated[4]
-
-        output_data['estimated_genome_size'] = safe_int(round(
+        output_data.update(params_to_dict(model.params, estimated))
+        output_data['loglikelihood'] = model.compute_loglikelihood(*estimated)
+        output_data['genome_size'] = safe_int(round(
             sum(
                 i * h for i, h in hist_orig.items()
             ) / model.correct_c(estimated[0] * sample_factor)
         ))
-
         if reads_size is not None:
-            output_data['estimated_genome_size_r'] = safe_int(
+            output_data['genome_size_reads'] = safe_int(
                 round(reads_size / (estimated[0] * sample_factor))
             )
-
-    if orig_error_rate is not None:
-        output_data['original_error_rate'] = orig_error_rate
-    elif estimated is not None:
-        orig_error_rate = estimated[1]
-
-    if orig_coverage is not None:
-        if model.repeats:
-            output_data['original_loglikelihood'] = model.compute_loglikelihood(
-                orig_coverage, orig_error_rate, orig_q1, orig_q2, orig_q
-            )
-        else:
-            output_data['original_loglikelihood'] = model.compute_loglikelihood(
-                orig_coverage, orig_error_rate
-            )
-
-    output_data['hist_size'] = len(model.hist)
-    output_data['sample_factor'] = sample_factor
+    if orig is not None and any(orig):
+        output_data.update(params_to_dict(('provided_%s' % name for name in model.params), orig))
+        try:
+            output_data['provided_loglikelihood'] = model.compute_loglikelihood(*replace_none(orig, estimated))
+        except ValueError:
+            pass
 
     if not silent:
-        # print(json.dumps(
-        #     output_data, sort_keys=True, indent=4, separators=(',', ': ')
-        # ))
         print(yaml.dump(output_data, indent=4, default_flow_style=False))
 
     return output_data
