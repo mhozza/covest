@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 
-covest = 'covest {hist} -s {reads} -k {k} -r {r} -sp 16 -m repeat'
+covest = 'covest {hist} -s {reads} -k {k} -r {r} -sp 16 -m repeat > output.yml'
 wd = Path(__file__).parent
 
 
