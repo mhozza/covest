@@ -27,7 +27,7 @@ def main(args):
             shutil.copy2(str(ds), str(p))
         else:
             print('Executing "%s":' % ds, file=sys.stderr)
-            ret = subprocess.call([str(ds.resolve())], shell=True)
+            ret = subprocess.call([str(ds.resolve())] + args.params, shell=True)
             if ret:
                 print('"%s" failed with return code:%d' % (ds, ret), file=sys.stderr)
                 exit(2)
@@ -46,7 +46,7 @@ def main(args):
     if args.config:
         cfg = p / 'config.json'
         cfg_json = json.loads(args.config)
-        json.dumpf(cfg_json, cfg.open(mode='w'))
+        json.dump(cfg_json, cfg.open(mode='w'))
 
 
 if __name__ == '__main__':
@@ -63,5 +63,7 @@ if __name__ == '__main__':
                         help='parameters for the experiment runner')
     parser.add_argument('-f', '--force', action='store_true',
                         help='force use existing path')
+    parser.add_argument('-p', '--params', nargs='*', default=tuple(),
+                        help='generation script params')
 
     main(parser.parse_args())
