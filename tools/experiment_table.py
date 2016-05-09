@@ -2,9 +2,9 @@
 import argparse
 from collections import defaultdict
 
-from covest.tools import templates
-from covest.tools.experiment_parser import parse_all
-from covest.tools.table_generator import format_table
+from tools import templates
+from tools.experiment_parser import parse_all
+from tools.table_generator import format_table
 
 SEPARATE_EF = True
 

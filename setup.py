@@ -48,9 +48,6 @@ setup(
         'covest': 'covest'
     },
     include_package_data=True,
-    package_data={
-        'covest': ['templates/*.tpl'],
-    },
     ext_modules=[covest_poisson],
     install_requires=requirements,
     entry_points={
