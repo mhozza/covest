@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.5
+#!/usr/bin/env python3
 import argparse
 import json
 import os
@@ -27,9 +27,10 @@ def main(args):
             shutil.copy2(str(ds), str(p))
         else:
             print('Executing "%s":' % ds, file=sys.stderr)
-            ret = subprocess.call([str(ds.resolve()), args.name] + args.params, shell=True)
+            command = [str(ds.resolve()), args.name] + args.params
+            ret = subprocess.call(command)
             if ret:
-                print('"%s" failed with return code:%d' % (ds, ret), file=sys.stderr)
+                print('"%s" failed with return code: %d.' % (ds, ret), file=sys.stderr)
                 exit(2)
             else:
                 print('"%s" succeeded.' % (ds,), file=sys.stderr)
@@ -38,7 +39,7 @@ def main(args):
     if args.runner:
         r = Path(args.runner)
         if r.exists():
-            shutil.copy2(str(r), str(p))
+            shutil.copy2(str(r), str(p / 'run'))
         else:
             print('File does not exist: %s' % r, file=sys.stderr)
             exit(2)

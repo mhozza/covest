@@ -62,7 +62,7 @@ setup(
         'bin/kmer_hist.py',
         'bin/read_sampler.py',
         'bin/generate_sequence.py',
-        'bin/read_simulator.py',       
+        'bin/read_simulator.py',
     ],
     license='GNU GPLv3',
     zip_safe=False,
