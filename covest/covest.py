@@ -86,7 +86,9 @@ class CoverageEstimator:
                 )
         except KeyboardInterrupt:
             pass
-        verbose_print('Estimation finished with status: %s.' % ('success' if success else 'failure',))
+        verbose_print('Estimation finished with status: %s.' % (
+            'success' if success else 'failure',
+        ))
         r[1] /= self.err_scale
         return r, success
 
@@ -120,7 +122,9 @@ def main(args):
     )
 
     orig = [None]*model.param_count
-    for i, v in zip(range(model.param_count), (args.coverage, args.error_rate) + tuple(args.params)):
+    for i, v in zip(
+        range(model.param_count), (args.coverage, args.error_rate) + tuple(args.params)
+    ):
         orig[i] = v
     fix = orig if args.fix else None
 
@@ -176,7 +180,9 @@ def run():
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
     parser.add_argument('input_histogram', type=str, help='Input histogram')
     parser.add_argument('-m', '--model', type=str, default='basic',
-                        help='Select models for estimation. Options: {}'.format(list(models.keys())))
+                        help='Select models for estimation. Options: {}'.format(
+                            list(models.keys()))
+                        )
     parser.add_argument('-k', '--kmer-size', type=int,
                         default=constants.DEFAULT_K, help='Kmer size')
     parser.add_argument('-r', '--read-length', type=int,
@@ -191,7 +197,8 @@ def run():
                         help='Plot probabilities (use --plot 1 to plot probs * j)')
     parser.add_argument('--load', type=str, help='Load json')
     parser.add_argument('-t', '--trim', type=int, default=None,
-                        help='Trim histogram at this value. Set to 0 to disable automatic trimming.')
+                        help='Trim histogram at this value. '
+                             'Set to 0 to disable automatic trimming.')
     parser.add_argument('-sf', '--sample-factor', type=int, default=None,
                         help='Use fixed sample factor for histogram sampling instead of automatic.'
                              ' Set to 1 to not sample at all.')
@@ -204,7 +211,8 @@ def run():
     parser.add_argument('-e', '--error-rate', type=float, help='Error rate')
     parser.add_argument('-es', '--error-scale', type=float, default=constants.DEFAULT_ERR_SCALE,
                         help='Error scale')
-    parser.add_argument('-mq1', '--min-q1', type=float, default=constants.DEFAULT_MIN_SINGLECOPY_RATIO,
+    parser.add_argument('-mq1', '--min-q1', type=float,
+                        default=constants.DEFAULT_MIN_SINGLECOPY_RATIO,
                         help='minimum single copy ratio')
     parser.add_argument('-p', '--params', type=nonefloat, nargs='*', default=tuple(),
                         help='Additional model parameters.')
