@@ -1,7 +1,7 @@
 #! /usr/bin/env python
+import argparse
 import os
 import subprocess
-import argparse
 
 source = 'data/chr14.fa'
 source = 'data/ecoli2.fa'

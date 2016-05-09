@@ -58,10 +58,11 @@ setup(
     },
     scripts=[
         'bin/gsest.py',
+        'bin/fasta_length.py',
+        'bin/kmer_hist.py',
+        'bin/read_sampler.py',
         'bin/generate_sequence.py',
         'bin/read_simulator.py',
-        'bin/prepare_experiment.py',
-        'bin/experiment_table.py',
         'bin/hist_analyze.py',
     ],
     license='GNU GPLv3',

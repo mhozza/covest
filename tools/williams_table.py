@@ -1,9 +1,10 @@
 #! /usr/bin/env python
 import argparse
 from collections import defaultdict
-from covest.tools.table_generator import format_table
+
+from covest.data import count_reads_size
 from covest.tools.experiment_parser import parse_all
-from covest.tools import templates
+from covest.tools.table_generator import format_table
 
 SEPARATE_EF = True
 
@@ -53,42 +54,23 @@ def compute_average(table_lines, std_key_suffix='_std'):
 def main(args):
     table_lines = parse_all(args.path, args.filter, not args.no_error, legacy=args.legacy)
 
+    for k, v in table_lines.items():
+        read_file = v['fname'][:v['fname'].find('_k21')] + '.fa'
+        rc = count_reads_size(read_file)
+        try:
+            v['williams_coverage'] = rc / v['williams_genome_size']
+        except ZeroDivisionError:
+            v['williams_coverage'] = None
+
     header = [
-        'seq_name',
-        'provided_coverage', 'provided_error_rate', 'provided_k',
-        'coverage', 'error_rate',
-        'genome_size',
-        'q1', 'q2', 'q',
-        'guessed_coverage', 'guessed_error_rate',
-        'provided_loglikelihood', 'loglikelihood', 'guessed_loglikelihood',
+        'original_coverage', 'original_error_rate',
+        'williams_coverage', 'williams_genome_size',
     ]
-
-    header_avg = [
-        'provided_coverage',
-        'provided_error_rate',
-        'provided_k',
-        'coverage', 'coverage_std',
-        'error_rate', 'error_rate_std',
-        'genome_size', 'genome_size_std',
-        'q1', 'q1_std',
-        'q2', 'q2_std',
-        'q', 'q_std',
-        'guessed_coverage', 'guessed_coverage_std',
-        'guessed_error_rate', 'guessed_error_rate_std',
-        'provided_loglikelihood', 'provided_loglikelihood_std',
-        'loglikelihood', 'loglikelihood_std',
-        'guessed_loglikelihood', 'guessed_loglikelihood_std',
-    ]
-
-    # header = [
-    #     'provided_coverage', 'provided_error_rate',
-    #     'coverage', 'error_rate',
-    # ]
 
     format_templates = {
-        'html': templates.html,
-        'csv': templates.csv,
-        'tex': templates.tex,
+        'html': 'templates/html.tpl',
+        'csv': 'templates/csv.tpl',
+        'tex': 'templates/tex.tpl',
     }
 
     format_escape = {
@@ -96,19 +78,24 @@ def main(args):
     }
 
     titles = {
-        'provided_coverage': 'Coverage',
-        'provided_error_rate': 'Error Rate',
-        'coverage': 'Est. Coverage',
-        'coverage_std': 'Est. Coverage Std',
-        'error_rate': 'Est. Error Rate',
-        'error_rate_std': 'Est. Error Rate Std',
-        'genome_size': 'Est. Genome Size',
-        'genome_size_std': 'Est. Genome Size Std',
+        'original_coverage': 'Coverage',
+        'original_error_rate': 'Error Rate',
+        'estimated_coverage': 'Est. Coverage',
+        'estimated_coverage_std': 'Est. Coverage Std',
+        'estimated_error_rate': 'Est. Error Rate',
+        'estimated_error_rate_std': 'Est. Error Rate Std',
+        'estimated_genome_size': 'Est. Genome Size',
+        'estimated_genome_size_std': 'Est. Genome Size Std',
     }
 
     if args.average:
         table_lines = compute_average(table_lines)
-        header = header_avg
+        header = [
+            'original_coverage', 'original_error_rate',
+            'estimated_coverage', 'estimated_coverage_std',
+            'estimated_error_rate', 'estimated_error_rate_std',
+            'estimated_genome_size', 'estimated_genome_size_std',
+        ]
 
     print(format_table(
         header,
@@ -116,11 +103,10 @@ def main(args):
         sorted(
             list(table_lines.values()),
             key=lambda x: (
-                x['provided_coverage'],
-                x['provided_error_rate'],
-                x['provided_k'],
+                x['original_coverage'],
+                x['original_error_rate'],
+                x['original_k'],
                 x.get('repeats', False),
-                x['seq_name'],
             )
         ),
         template_file=format_templates[args.format],

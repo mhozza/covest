@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
-import json
 import argparse
+import json
 
 
 def fix_genome_size(j):

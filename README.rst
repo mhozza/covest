@@ -61,9 +61,9 @@ Other included tools
 
 -  ``geset.py`` tool for estimation genome size from reads and known
    coverage
--  ``prepare_experient.py`` tool for experiment pipeline setup
--  ``experiment_table.py`` tool which collects data from experiment and
-   create a nice table (html, tex, and csv formats are supported)
+-  ``kmer_hist.py`` custom khmer histogram computation, it is much slower than other tools, so use it only if you have no other option.
+-  ``read_sampler.py`` script for subsampling reads, useful if you have very high coverage data and want to make it smaller.
+-  ``fasta_length.py`` get total length of all sequences in fasta file.
 -  Read simulator:
 
    -  ``generate_sequence.py`` random sequence generator
