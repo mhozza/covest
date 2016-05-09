@@ -27,7 +27,7 @@ def main(args):
             shutil.copy2(str(ds), str(p))
         else:
             print('Executing "%s":' % ds, file=sys.stderr)
-            ret = subprocess.call([str(ds.resolve())] + args.params, shell=True)
+            ret = subprocess.call([str(ds.resolve()), args.name] + args.params, shell=True)
             if ret:
                 print('"%s" failed with return code:%d' % (ds, ret), file=sys.stderr)
                 exit(2)
