@@ -15,7 +15,10 @@ def main(args):
     if not args.force and p.exists():
         print('Path already exists. Use --force to use it.', file=sys.stderr)
         exit(1)
-    p.mkdir(exist_ok=True)
+    try:
+        p.mkdir()
+    except FileExistsError:
+        pass
 
     # gather data
     if args.datasource:
