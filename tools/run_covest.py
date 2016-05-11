@@ -16,7 +16,7 @@ def run(command, output=None):
 
 
 def main(args):
-    os.chdir(wd.path)
+    os.chdir(str(wd))
     cfg_file = args.config_file
     with open(cfg_file) as f:
         cfg = json.load(f)
