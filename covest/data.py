@@ -5,6 +5,7 @@ from os import path
 import yaml
 from first import first
 
+from covest import __version__
 from .models import models, BasicModel
 from .utils import safe_int, verbose_print
 
@@ -57,7 +58,9 @@ def parse_data(f):
         data.get('guessed_error_rate', None),
     ]
     estimated = [data.get(k, None) for k in model.params]
-    return namedtuple('ParsedData', ('estimated', 'guess', 'model'))(estimated=estimated, guess=guess, model=model)
+    return namedtuple('ParsedData', ('estimated', 'guess', 'model'))(
+        estimated=estimated, guess=guess, model=model
+    )
 
 
 def replace_none(dest, src):
@@ -70,6 +73,7 @@ def replace_none(dest, src):
         if dest[i] is None:
             dest[i] = src[i]
     return dest
+
 
 def print_output(
     hist_orig,
@@ -101,6 +105,7 @@ def print_output(
         'hist_size': max(model.hist),
         'sample_factor': sample_factor,
         'success': success,
+        'version': __version__,
     }
 
     if guess is not None:
@@ -121,7 +126,9 @@ def print_output(
     if orig is not None and any(orig):
         output_data.update(params_to_dict(('provided_%s' % name for name in model.params), orig))
         try:
-            output_data['provided_loglikelihood'] = model.compute_loglikelihood(*replace_none(orig, estimated))
+            output_data['provided_loglikelihood'] = model.compute_loglikelihood(
+                *replace_none(orig, estimated)
+            )
         except ValueError:
             pass
 

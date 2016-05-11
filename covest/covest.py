@@ -3,6 +3,7 @@ from multiprocessing import Pool
 
 from scipy.optimize import minimize
 
+from covest import version_string
 from . import constants
 from .data import count_reads_size, parse_data, print_output, load_histogram
 from .grid import initial_grid, optimize_grid
@@ -121,7 +122,7 @@ def main(args):
         min_single_copy_ratio=args.min_q1,
     )
 
-    orig = [None]*model.param_count
+    orig = [None] * model.param_count
     for i, v in zip(
         range(model.param_count), (args.coverage, args.error_rate) + tuple(args.params)
     ):
@@ -179,6 +180,8 @@ def main(args):
 def run():
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
     parser.add_argument('input_histogram', type=str, help='Input histogram')
+    parser.add_argument('-v', '--version', action='version', version=version_string,
+                        help='Print version and exit.')
     parser.add_argument('-m', '--model', type=str, default='basic',
                         help='Select models for estimation. Options: {}'.format(
                             list(models.keys()))
