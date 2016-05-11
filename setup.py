@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 try:
-    from setuptools.core import setup, Extension
+    from setuptools import setup, Extension
 except ImportError:
     from distutils.core import setup, Extension
+
+import sys
 
 try:
     with open('README.rst') as readme_file:
@@ -21,6 +23,9 @@ requirements = [
     'first',
     'pyyaml',
 ]
+
+if sys.version_info < (3, 5):
+    requirements.append('pyparsing!=2.1.2')
 
 test_requirements = [
 ]
