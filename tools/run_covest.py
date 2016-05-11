@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 
-covest = 'covest {hist} -s {reads} -k {k} -r {r} -sp 16 -m repeat > output.yml'
+covest = 'covest {hist} -s {reads} -k {k} -r {r} -sp 16 -m repeat'
 wd = Path(__file__).parent
 
 
@@ -21,7 +21,7 @@ def main(args):
     with open(cfg_file) as f:
         cfg = json.load(f)
     print(cfg)
-    run(covest.format(**cfg))
+    run(covest.format(**cfg), output='output.yml')
 
 
 if __name__ == '__main__':
