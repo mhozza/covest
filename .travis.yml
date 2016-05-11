@@ -17,7 +17,7 @@ deploy:
       dUU1ZzZDODFVaWxNalpPSE9WUFlwSDNaYUhGMndkN0hRR0p5SG5jTTNGY24rTUIrb1BBVDQwTkd2
       WEQ5SmYvYkp6anJPQlZCUTdmODNRYTFpK0MzZWVldTVtZmN2Mks5clFhNStva3BUS0xrK0h0dXl0
       SG9uNnhLWFprWXBWWm12S1JnLyt6dnJQdW05QU1zVWdha0VCM1VEdEdKdVIzOFBXdThFLzZ1RG89
-  distributions: sdist bdist_wheel
+  distributions: sdist
   provider: pypi
   user: mhozza
 install:
