@@ -25,9 +25,11 @@ def avg_read_length(file_path):
     return round(s / n)
 
 
-def run(command, output=None):
+def run(command, shell=False, output=None):
     f = open(output, 'w') if output else None
-    return subprocess.call(command.split(), stdout=f)
+    if not shell:
+        command = command.split()
+    return subprocess.call(command, shell=shell, stdout=f)
 
 
 def main(args):
@@ -59,8 +61,8 @@ def main(args):
         'infile': seq_file,
         'outfile': hist_file,
     }
-    run(jellyfish_count.format(**params))
-    run(jellyfish_hist.format(**params))
+    run(jellyfish_count.format(**params), shell=True)
+    run(jellyfish_hist.format(**params), shell=True)
 
     # generate_config
     config = {
