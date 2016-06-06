@@ -12,6 +12,8 @@ reads.
 Requirements
 ------------
 - python 3.4+
+- python-dev
+- gcc
 
 Installation
 ------------
