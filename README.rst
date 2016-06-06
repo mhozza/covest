@@ -12,7 +12,7 @@ reads.
 Requirements
 ------------
 - python 3.4+
-- python-dev
+- python3-dev
 - gcc
 
 Installation
