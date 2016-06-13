@@ -22,6 +22,8 @@ def load_histogram(fname):
     hist = dict()
     with open(fname, 'r') as f:
         for line in f:
+            if line[0] == '#':
+                continue
             try:
                 l = line.split()
                 i = int(l[0])
@@ -136,3 +138,9 @@ def print_output(
         print(yaml.dump(output_data, indent=4, default_flow_style=False))
 
     return output_data
+
+
+def save_histogram(hist, fname):
+    with open(fname, 'w') as f:
+        for k, v in hist.items():
+            f.write('%d %d\n' % (k, v))
