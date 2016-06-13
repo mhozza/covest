@@ -37,7 +37,7 @@ class TestLoadHistogram(unittest.TestCase):
             15: 1,
         }
 
-        hist = load_histogram(str(self.folder / 'simulated_c10_e0.05_r100_k21.hist'))
+        hist, meta = load_histogram(str(self.folder / 'simulated_c10_e0.05_r100_k21.hist'))
         self.assertDictEqual(hist, true_histogram)
 
     def test_load_sparse_histogram(self):
@@ -54,7 +54,7 @@ class TestLoadHistogram(unittest.TestCase):
             15: 1,
         }
 
-        hist = load_histogram(str(self.folder / 'simulated_c10_e0.05_r100_k21_sparse.hist'))
+        hist, meta = load_histogram(str(self.folder / 'simulated_c10_e0.05_r100_k21_sparse.hist'))
         self.assertDictEqual(hist, true_histogram)
 
     def test_load_nonexisting_file(self):
@@ -63,10 +63,10 @@ class TestLoadHistogram(unittest.TestCase):
 
     def test_load_invalid_histogram(self):
         with self.assertRaises(InvalidFormatException):
-            hist = load_histogram(str(self.folder / 'invalid.hist'))
+            load_histogram(str(self.folder / 'invalid.hist'))
 
     def test_load_empty_histogram(self):
-        hist = load_histogram(str(self.folder / 'empty.hist'))
+        hist, meta = load_histogram(str(self.folder / 'empty.hist'))
         self.assertEqual(len(hist), 0)
 
 

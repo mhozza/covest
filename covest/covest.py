@@ -1,6 +1,7 @@
 import argparse
 from multiprocessing import Pool
 
+from pathlib import Path
 from scipy.optimize import minimize
 
 from covest import version_string
@@ -110,10 +111,19 @@ def main(args):
 
     if sample_factor > 1:
         fname = '%s.covest.sampled_x%d.hist' % (Path(args.input_histogram).stem, sample_factor)
-        save_histogram(hist, fname)
+        save_histogram(hist, fname, {
+            'tool': version_string,
+            'sample_factor': sample_factor,
+        })
     err_scale = args.error_scale
+
     if sample_factor is None:
         sample_factor = 1
+    if 'sample_factor' in meta:
+        try:
+            sample_factor *= int(meta['sample_factor'])
+        except ValueError as e:
+            print(e)
     if args.coverage:
         args.coverage /= sample_factor
 

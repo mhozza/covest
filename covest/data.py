@@ -20,18 +20,24 @@ class InvalidFormatException(Exception):
 
 def load_histogram(fname):
     hist = dict()
+    meta = dict()
     with open(fname, 'r') as f:
         for line in f:
             if line[0] == '#':
-                continue
-            try:
-                l = line.split()
-                i = int(l[0])
-                cnt = int(l[1])
-                hist[i] = cnt
-            except (ValueError, KeyError):
-                raise InvalidFormatException(fname)
-    return hist
+                try:
+                    k, v = line[1:].strip().split(':')
+                    meta[k] = v
+                except IndexError:
+                    pass
+            else:
+                try:
+                    l = line.split()
+                    i = int(l[0])
+                    cnt = int(l[1])
+                    hist[i] = cnt
+                except (ValueError, KeyError):
+                    raise InvalidFormatException(fname)
+    return hist, meta
 
 
 @lru_cache(maxsize=None)
@@ -140,7 +146,10 @@ def print_output(
     return output_data
 
 
-def save_histogram(hist, fname):
+def save_histogram(hist, fname, meta=None):
     with open(fname, 'w') as f:
+        if meta:
+            for k, v in meta.items():
+                f.write('#{}:{}\n'.format(k, v))
         for k, v in hist.items():
             f.write('%d %d\n' % (k, v))
