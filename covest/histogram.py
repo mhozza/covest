@@ -1,6 +1,6 @@
 import random
 from collections import defaultdict
-from covest_poisson import poisson
+from covest_poisson import poisson_dist
 from math import exp, floor, ceil
 
 from scipy.stats import binom
@@ -62,7 +62,7 @@ def sample_histogram(hist, factor=2, trim=None):
             b = binom(i, prob)
             probs = [b.pmf(j) for j in range(1, i + 1)]
         else:
-            probs = [poisson(i * prob, j) for j in range(1, i + 1)]
+            probs = poisson_dist(i * prob, i)
 
         for j, p in enumerate(probs):
             h[j + 1] += v * p
