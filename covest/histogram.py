@@ -1,7 +1,9 @@
 import random
 from collections import defaultdict
 from covest_poisson import poisson_dist
+from functools import partial
 from math import exp, floor, ceil
+from multiprocessing.pool import Pool, ThreadPool
 
 from scipy.stats import binom
 
@@ -44,7 +46,19 @@ def compute_coverage_apx(hist, k, r):
         return 0.0, 1.0
 
 
-def sample_histogram(hist, factor=2, trim=None):
+def compute_binomial_probs(prob, i):
+    if i < 100:
+        b = binom(i, prob)
+        return [b.pmf(j) for j in range(1, i + 1)]
+    else:
+        return poisson_dist(i * prob, i)
+
+
+def compute_hist_item_from_probs(hist, prob_list, j):
+    return sum(prob_list[i][j] * v for i, v in enumerate(hist.values()) if j < len(prob_list[i]))
+
+
+def sample_histogram(hist, factor=2, trim=None, n_threads=constants.DEFAULT_THREAD_COUNT):
     if trim is None:
         if len(hist) > 300:
             trim = get_trim(hist)
@@ -54,24 +68,17 @@ def sample_histogram(hist, factor=2, trim=None):
         trim = min(max(hist), trim * factor)
 
     hist = {k: v for k, v in hist.items() if k < trim}
-    h = defaultdict(int)
-    prob = 1.0 / factor
+    compute_probs = partial(compute_binomial_probs, 1.0 / factor)
+    # probs_list = map(compute_probs, hist.keys())
+    with ThreadPool(n_threads) as pool:
+        probs_list = pool.map(compute_probs, hist.keys())
 
-    for i, v in hist.items():
-        if i < 100:
-            b = binom(i, prob)
-            probs = [b.pmf(j) for j in range(1, i + 1)]
-        else:
-            probs = poisson_dist(i * prob, i)
+        h = list(pool.map(partial(compute_hist_item_from_probs, hist, probs_list), range(trim)))
 
-        for j, p in enumerate(probs):
-            h[j + 1] += v * p
-
-    h = dict(h)
-    for i, v in h.items():
+    for i, v in enumerate(h):
         d = v - round(v)
         h[i] = ceil(v) if random.random() < d else floor(v)
-    return {k: v for k, v in h.items() if v > 0}   # remove 0 elements
+    return {k + 1: v for k, v in enumerate(h) if v > 0}   # remove 0 elements
 
 
 def auto_sample_hist(hist, k, r, trim=None):
