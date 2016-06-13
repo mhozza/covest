@@ -77,11 +77,28 @@ def sample_histogram(hist, factor=2, trim=None):
 def auto_sample_hist(hist, k, r, trim=None):
     h = dict(hist)
     f = 1
+    s = 1
     c, e = compute_coverage_apx(hist, k, r)
+
     while c > constants.AUTO_SAMPLE_TARGET_COVERAGE:
-        f += 1
+        f += s
+        s *= 2
         h = sample_histogram(hist, factor=f, trim=trim)
         c, e = compute_coverage_apx(h, k, r)
+
+    s //= 4
+    f2 = f - s
+    while s >= 1:
+        h2 = sample_histogram(hist, factor=f2, trim=trim)
+        c, e = compute_coverage_apx(h2, k, r)
+        if c > constants.AUTO_SAMPLE_TARGET_COVERAGE:
+            f2 += s
+        else:
+            h = h2
+            f = f2
+            f2 -= s
+        s //= 2
+
     return h, f, c, e
 
 
