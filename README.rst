@@ -67,11 +67,6 @@ Other included tools
 -  ``kmer_hist.py`` custom khmer histogram computation, it is much slower than other tools, so use it only if you have no other option.
 -  ``read_sampler.py`` script for subsampling reads, useful if you have very high coverage data and want to make it smaller.
 -  ``fasta_length.py`` get total length of all sequences in fasta file.
--  Read simulator:
-
-   -  ``generate_sequence.py`` random sequence generator
-   -  ``read_simulator.py`` tool for generating random reads form the
-      sequence
 
 Copyright and citation
 ----------------------
