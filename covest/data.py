@@ -93,6 +93,7 @@ def print_output(
     orig=None,
     reads_size=None,
     silent=False,
+    orig_sample_factor=1
 ):
     def params_to_dict(names, values):
         nonlocal sample_factor
@@ -112,6 +113,7 @@ def print_output(
         'model': model.short_name(),
         'hist_size': max(model.hist),
         'sample_factor': sample_factor,
+        'orig_sample_factor': orig_sample_factor,
         'success': success,
         'version': __version__,
     }
@@ -121,6 +123,7 @@ def print_output(
         output_data['guessed_loglikelihood'] = model.compute_loglikelihood(*guess)
     if estimated is not None:
         output_data.update(params_to_dict(model.params, estimated))
+        output_data['orig_coverage'] = float(estimated[0] * orig_sample_factor * sample_factor)
         output_data['loglikelihood'] = model.compute_loglikelihood(*estimated)
         output_data['genome_size'] = safe_int(round(
             sum(
