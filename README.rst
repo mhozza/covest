@@ -61,8 +61,9 @@ The output are lines containing ``key: value``. The most important keys are ``co
 Other included tools
 --------------------
 
--  ``geset.py`` tool for estimation genome size from reads and known
+-  ``geset.py`` tool for estimation genome size from reads size and known
    coverage
+-  ``reads_size.py`` tool for computation of the total reads size
 -  ``kmer_hist.py`` custom khmer histogram computation, it is much slower than other tools, so use it only if you have no other option.
 -  ``read_sampler.py`` script for subsampling reads, useful if you have very high coverage data and want to make it smaller.
 -  ``fasta_length.py`` get total length of all sequences in fasta file.
