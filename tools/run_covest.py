@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 
-covest = 'covest {hist} -s {reads} -k {k} -r {r} -sp 32 -m repeat'
+covest = 'covest {hist} -rs {reads_size} -k {k} -r {r} -sp 16 -m repeat'
 wd = Path(__file__).parent
 
 

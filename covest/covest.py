@@ -4,13 +4,14 @@ from multiprocessing import Pool
 from scipy.optimize import minimize
 
 from covest import version_string
+
 from . import constants
-from .data import count_reads_size, parse_data, print_output, load_histogram
+from .data import load_histogram, parse_data, print_output
 from .grid import initial_grid, optimize_grid
 from .histogram import process_histogram
-from .models import select_model, models
+from .models import models, select_model
 from .perf import running_time, running_time_decorator
-from .utils import verbose_print, nonefloat
+from .utils import nonefloat, verbose_print
 
 
 class CoverageEstimator:
@@ -106,9 +107,6 @@ def main(args):
         hist_orig, args.kmer_size, args.read_length,
         trim=args.trim, sample_factor=args.sample_factor,
     )
-    reads_size = None
-    if args.read_file is not None:
-        reads_size = count_reads_size(args.read_file)
     err_scale = args.error_scale
     if sample_factor is None:
         sample_factor = 1
@@ -167,7 +165,7 @@ def main(args):
             print_output(
                 hist_orig, model, success, sample_factor,
                 res, guess, orig,
-                reads_size=reads_size,
+                reads_size=args.reads_size,
             )
 
         # Draw plot
@@ -190,8 +188,8 @@ def run():
                         default=constants.DEFAULT_K, help='Kmer size')
     parser.add_argument('-r', '--read-length', type=int,
                         default=constants.DEFAULT_READ_LENGTH, help='Read length')
-    parser.add_argument('-s', '--genome-size', dest='read_file',
-                        help='Calculate genome size from reads')
+    parser.add_argument('-rs', '--reads-size', type=int,
+                        help='Calculate genome size from reads size')
     parser.add_argument('-sp', '--starting-points', type=int, default=1,
                         help='Number of point to start optimization from.')
     parser.add_argument('-T', '--thread-count', default=constants.DEFAULT_THREAD_COUNT, type=int,

@@ -7,6 +7,7 @@ import subprocess
 from Bio import SeqIO
 from covest.constants import DEFAULT_K
 from pathlib import Path
+from covest.data import count_reads_size
 
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o {infile}.jf'
 jellyfish_hist = 'jellyfish histo {infile}.jf* -o {outfile}'
@@ -64,9 +65,13 @@ def main(args):
     run(jellyfish_count.format(**params), shell=True)
     run(jellyfish_hist.format(**params), shell=True)
 
+    print('Computing reads size...')
+    rs = count_reads_size(seq_file.name)
+
     # generate_config
     config = {
         'reads': str(seq_file.name),
+        'reads_size': rs,
         'hist': str(hist_file.name),
         'k': DEFAULT_K,
         'r': read_len,
