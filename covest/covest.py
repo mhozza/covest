@@ -1,12 +1,13 @@
 import argparse
 from multiprocessing import Pool
 
+from pathlib import Path
 from scipy.optimize import minimize
 
 from covest import version_string
 
 from . import constants
-from .data import load_histogram, parse_data, print_output
+from .data import load_histogram, parse_data, print_output, save_histogram
 from .grid import initial_grid, optimize_grid
 from .histogram import process_histogram
 from .models import models, select_model
@@ -101,12 +102,25 @@ def main(args):
     verbose_print('Loading histogram {} with parameters k={} r={}.'.format(
         args.input_histogram, args.kmer_size, args.read_length,
     ))
-    hist_orig = load_histogram(args.input_histogram)
+    hist_orig, meta = load_histogram(args.input_histogram)
     # Process histogram and obtain first guess for c and e
     hist, tail, sample_factor, guess_c, guess_e = process_histogram(
         hist_orig, args.kmer_size, args.read_length,
         trim=args.trim, sample_factor=args.sample_factor,
     )
+
+    orig_sample_factor = 1
+    if 'sample_factor' in meta:
+        try:
+            orig_sample_factor = int(meta['sample_factor'])
+        except ValueError as e:
+            print(e)
+    if sample_factor > 1:
+        fname = '%s.covest.sampled_x%d.hist' % (Path(args.input_histogram).stem, sample_factor)
+        save_histogram(hist, fname, {
+            'tool': version_string,
+            'sample_factor': sample_factor * orig_sample_factor,
+        })
     err_scale = args.error_scale
     if sample_factor is None:
         sample_factor = 1
@@ -166,6 +180,7 @@ def main(args):
                 hist_orig, model, success, sample_factor,
                 res, guess, orig,
                 reads_size=args.reads_size,
+                orig_sample_factor=orig_sample_factor,
             )
 
         # Draw plot

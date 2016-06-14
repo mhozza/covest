@@ -52,7 +52,9 @@ class TestSampleHistogram(unittest.TestCase):
             i = a.get(k, 0)
             j = b.get(k, 0)
             if abs(i - j) > threshold:
-                raise AssertionError('{} and {} differs by more then threshold {}'.format(i, j, threshold))
+                raise AssertionError(
+                    '{} and {} differs by more then threshold {}'.format(i, j, threshold)
+                )
 
     def test_sample_histogram(self):
         histogram = {
@@ -72,7 +74,19 @@ class TestSampleHistogram(unittest.TestCase):
             14: 9,
             15: 1,
         }
-        true_hist = {1: 2949548, 2: 255275, 3: 108173, 4: 36802, 5: 10079, 6: 2303, 7: 452, 8: 79, 9: 12, 10: 3, 11: 1}
+        true_hist = {
+            1: 2949548,
+            2: 255275,
+            3: 108173,
+            4: 36802,
+            5: 10079,
+            6: 2303,
+            7: 452,
+            8: 79,
+            9: 12,
+            10: 3,
+            11: 1,
+        }
         sampled_hist = sample_histogram(histogram, 2)
         self.assertDictEqualApprox(sampled_hist, true_hist, 2)
 
@@ -89,7 +103,9 @@ class TestSampleHistogram(unittest.TestCase):
             13: 5,
             15: 1,
         }
-        true_hist = {1: 2936731, 2: 229577, 3: 82298, 4: 23544, 5: 7025, 6: 1946, 7: 279, 8: 23, 9: 1}
+        true_hist = {
+            1: 2936731, 2: 229577, 3: 82298, 4: 23544, 5: 7025, 6: 1946, 7: 279, 8: 23, 9: 1
+        }
         sampled_hist = sample_histogram(histogram, 2)
         self.assertDictEqualApprox(sampled_hist, true_hist, 2)
 
@@ -113,7 +129,7 @@ class TestTrimHistogram(unittest.TestCase):
             14: 9,
             15: 1,
         }
-        trimmed_hist, tail =trim_hist(histogram, 10)
+        trimmed_hist, tail = trim_hist(histogram, 10)
         self.assertEqual(max(trimmed_hist), 9)
         self.assertEqual(sum(trimmed_hist.values()) + tail, sum(histogram.values()))
 
