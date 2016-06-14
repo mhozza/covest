@@ -7,13 +7,12 @@ import subprocess
 from Bio import SeqIO
 from covest.constants import DEFAULT_K
 from pathlib import Path
-from covest.data import count_reads_size
 
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o {infile}.jf'
 jellyfish_hist = 'jellyfish histo {infile}.jf* -o {outfile}'
 
 
-def avg_read_length(file_path):
+def avg_read_length_and_size(file_path):
     ext = file_path.suffix
     fmt = 'fasta'
     if ext == '.fq' or ext == '.fastq':
@@ -23,7 +22,7 @@ def avg_read_length(file_path):
         for read in SeqIO.parse(f, fmt):
             s += len(read.seq)
             n += 1
-    return round(s / n)
+    return round(s / n), s
 
 
 def run(command, shell=False, output=None):
@@ -46,13 +45,13 @@ def main(args):
         print('File does not exist: %s' % source)
         exit(1)
 
-    # calculate read_length
-    if args.read_length:
-        read_len = args.read_length
+    # calculate read_length and size
+    if args.read_length and args.reads_size:
+        read_len, reads_size = args.read_length, args.reads_size
     else:
-        print('Calculating read length...')
-        read_len = avg_read_length(seq_file)
-        print('read length: %d' % read_len)
+        print('Calculating read length and size...')
+        read_len, reads_size = avg_read_length_and_size(seq_file)
+        print('read length: %d, size: %d' % (read_len, reads_size))
 
     # generate histogram
     print('Generating histogram...')
@@ -65,13 +64,10 @@ def main(args):
     run(jellyfish_count.format(**params), shell=True)
     run(jellyfish_hist.format(**params), shell=True)
 
-    print('Computing reads size...')
-    rs = count_reads_size(seq_file.name)
-
     # generate_config
     config = {
         'reads': str(seq_file.name),
-        'reads_size': rs,
+        'reads_size': reads_size,
         'hist': str(hist_file.name),
         'k': DEFAULT_K,
         'r': read_len,
