@@ -39,8 +39,11 @@ def main(args):
     source = Path(args.source)
     seq_file = dest / ('reads%s' % source.suffix)
     if source.exists():
-        print('Copying file...')
-        shutil.copy2(str(source), str(seq_file))
+        if not seq_file.exists():
+            print('Copying file...')
+            shutil.copy2(str(source), str(seq_file))
+        else:
+            print('File already exists. Not overriding.');
     else:
         print('File does not exist: %s' % source)
         exit(1)
