@@ -83,4 +83,5 @@ if __name__ == '__main__':
     parser.add_argument('dest', help='directory')  # required param from prepare_experiment_script
     parser.add_argument('source', help='fasta file with reads')
     parser.add_argument('read_length', nargs='?', default=None, help='average read length')
+    parser.add_argument('reads_size', nargs='?', default=None, help='average read length')
     main(parser.parse_args())
