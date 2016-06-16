@@ -34,10 +34,10 @@ def run(command, shell=False, output=None):
 
 
 def main(args):
-    dest = Path(args.dest)
+    dest = Path(args.dest).resolve()
 
     # copy reads file
-    source = Path(args.source)
+    source = Path(args.source).resolve()
     seq_file = dest / ('reads%s' % source.suffix)
     if source.exists():
         if args.copy:
