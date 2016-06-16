@@ -31,6 +31,8 @@ def main(args):
         else:
             print('Executing "%s":' % ds, file=sys.stderr)
             command = [str(ds.resolve()), args.name] + args.params
+            if args.copy:
+                command.append('--copy')
             ret = subprocess.call(command)
             if ret:
                 print('"%s" failed with return code: %d.' % (ds, ret), file=sys.stderr)
@@ -42,7 +44,10 @@ def main(args):
     if args.runner:
         r = Path(args.runner)
         if r.exists():
-            shutil.copy2(str(r), str(p / 'run'))
+            if args.copy:
+                shutil.copy2(str(r), str(p / 'run'))
+            else:
+                os.symlink(str(r), str(p / 'run'))
         else:
             print('File does not exist: %s' % r, file=sys.stderr)
             exit(2)
@@ -69,5 +74,6 @@ if __name__ == '__main__':
                         help='force use existing path')
     parser.add_argument('-p', '--params', nargs='*', default=tuple(),
                         help='generation script params')
+    parser.add_argument('--copy', action='store_true', help='copy reads instead of linking')
 
     main(parser.parse_args())

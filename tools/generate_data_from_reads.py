@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import shutil
 import subprocess
 
@@ -39,11 +40,14 @@ def main(args):
     source = Path(args.source)
     seq_file = dest / ('reads%s' % source.suffix)
     if source.exists():
-        if not seq_file.exists():
-            print('Copying file...')
-            shutil.copy2(str(source), str(seq_file))
+        if args.copy:
+            if not seq_file.exists():
+                print('Copying file...')
+                shutil.copy2(str(source), str(seq_file))
+            else:
+                print('File already exists. Not overriding.')
         else:
-            print('File already exists. Not overriding.');
+            os.symlink(str(source), str(seq_file))
     else:
         print('File does not exist: %s' % source)
         exit(1)
@@ -87,4 +91,5 @@ if __name__ == '__main__':
     parser.add_argument('source', help='fasta file with reads')
     parser.add_argument('read_length', nargs='?', default=None, help='average read length')
     parser.add_argument('reads_size', nargs='?', default=None, help='reads size')
+    parser.add_argument('--copy', action='store_true', help='copy reads instead of linking')
     main(parser.parse_args())
