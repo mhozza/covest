@@ -42,7 +42,7 @@ def main(args):
 
     # copy runner script
     if args.runner:
-        r = Path(args.runner)
+        r = Path(args.runner).resolve()
         if r.exists():
             if args.copy:
                 shutil.copy2(str(r), str(p / 'run'))

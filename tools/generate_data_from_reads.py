@@ -10,7 +10,7 @@ from covest.constants import DEFAULT_K
 from pathlib import Path
 
 jellyfish_count = 'jellyfish count -m {k} -s 500M -t 16 -C {infile} -o {infile}.jf'
-jellyfish_hist = 'jellyfish histo {infile}.jf* -o {outfile}'
+jellyfish_hist = 'jellyfish histo {infile}.jf -o {outfile}'
 
 
 def avg_read_length_and_size(file_path):
