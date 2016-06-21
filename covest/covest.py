@@ -1,11 +1,10 @@
 import argparse
 from multiprocessing import Pool
-
 from pathlib import Path
+
 from scipy.optimize import minimize
 
 from covest import version_string
-
 from . import constants
 from .data import load_histogram, parse_data, print_output, save_histogram
 from .grid import initial_grid, optimize_grid
@@ -163,8 +162,14 @@ def main(args):
                     for i, v in fix:
                         if v is not None:
                             guess[i] = v
+            guess_ll = model.compute_loglikelihood(*guess)
+            if guess_ll == -constants.INF:
+                verbose_print(
+                    'Unable to compute likelihood. Please, try to trim the histogram, or use more complex model'
+                )
+                exit(1)
             verbose_print('Initial guess: {} ll:{}'.format(
-                guess, model.compute_loglikelihood(*guess)
+                guess, guess_ll
             ))
 
             # Estimate coverage

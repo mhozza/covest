@@ -108,16 +108,18 @@ def remove_noise(hist):
     return hist_denoised
 
 
-def get_trim(hist):
+def get_trim(hist, ignore_last=False):
     hist = remove_noise(hist)
     ss = float(sum(hist.values()))
+    if ignore_last:
+        ss -= hist[max(hist)]
     s = 0.0
     trim = max(hist)
     for i, h in sorted(hist.items()):
         s += h
         r = s / ss
         r = round(r, constants.AUTO_TRIM_PRECISION)
-        if r == 1:
+        if r >= 1:
             trim = i
             break
     return trim
@@ -141,11 +143,14 @@ def process_histogram(hist, k, r, trim=None, sample_factor=None):
     if sample_factor is None:
         verbose_print('Sampling histogram...')
         hist, sample_factor, c, e = auto_sample_hist(hist, k, r, trim=trim)
-        verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
+        if sample_factor > 1:
+            verbose_print('Histogram sampled with factor {}.'.format(sample_factor))
+        else:
+            verbose_print('No sampling necessary')
     else:
         c, e = compute_coverage_apx(hist, k, r)
     if trim is None:
-        trim = get_trim(hist)
+        trim = get_trim(hist, ignore_last=True)
         verbose_print('Trimming at: {}'.format(trim))
         hist, tail = trim_hist(hist, trim)
     elif trim > 0:
