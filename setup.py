@@ -39,7 +39,7 @@ covest_poisson = Extension(
 
 setup(
     name='covest',
-    version='0.5.0',
+    version='0.5.1',
     description="Covest estimates the coverage and genome size, "
     "just from k-mer abundance histogram computed from DNA sequences reads.",
     long_description=readme,
