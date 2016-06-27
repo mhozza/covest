@@ -93,7 +93,9 @@ def print_output(
     orig=None,
     reads_size=None,
     silent=False,
-    orig_sample_factor=1
+    orig_sample_factor=1,
+    starting_points=1,
+    use_grid_search=False,
 ):
     def params_to_dict(names, values):
         nonlocal sample_factor
@@ -116,6 +118,8 @@ def print_output(
         'orig_sample_factor': orig_sample_factor,
         'success': success,
         'version': __version__,
+        'starting_points': starting_points,
+        'use_grid_search': use_grid_search,
     }
 
     if guess is not None:
