@@ -1,8 +1,9 @@
+import random
 from collections import namedtuple
-from functools import lru_cache
 from os import path
 
 import yaml
+from Bio import SeqIO
 from first import first
 
 from covest import __version__
@@ -40,18 +41,36 @@ def load_histogram(fname):
     return hist, meta
 
 
-@lru_cache(maxsize=None)
-def count_reads_size(fname):
-    from Bio import SeqIO
+def load_reads(fname):
     _, ext = path.splitext(fname)
     fmt = 'fasta'
     if ext == '.fq' or ext == '.fastq':
         fmt = 'fastq'
     try:
         with open(fname, "rU") as f:
-            return sum(len(read) for read in SeqIO.parse(f, fmt))
+            for read in SeqIO.parse(f, fmt):
+                yield read.id, read.seq
     except FileNotFoundError as e:
         verbose_print(e)
+
+
+def sample_reads(src_reads_file, dest_reads_file, factor):
+    prob = 1.0 / factor
+    with open(dest_reads_file, 'w') as f:
+        for read_id, read in load_reads(src_reads_file):
+            if random.random() < prob:
+                f.write('>{}\n'.format(read_id))
+                f.write('{}\n'.format(read))
+
+
+def count_reads_stats(fname):
+    s = n = 0
+    for _, read in load_reads(fname):
+        s += len(read)
+        n += 1
+
+    ar = round(s / n) if n else 0
+    return ar, s
 
 
 def parse_data(f):

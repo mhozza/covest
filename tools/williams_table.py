@@ -2,7 +2,7 @@
 import argparse
 from collections import defaultdict
 
-from covest.data import count_reads_size
+from covest.data import count_reads_stats
 from tools.experiment_parser import parse_all
 from tools.table_generator import format_table
 
@@ -56,7 +56,7 @@ def main(args):
 
     for k, v in table_lines.items():
         read_file = v['fname'][:v['fname'].find('_k21')] + '.fa'
-        rc = count_reads_size(read_file)
+        _, rc = count_reads_stats(read_file)
         try:
             v['williams_coverage'] = rc / v['williams_genome_size']
         except ZeroDivisionError:
