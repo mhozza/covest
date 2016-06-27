@@ -155,7 +155,7 @@ def print_output(
         ))
         if reads_size is not None:
             output_data['genome_size_reads'] = safe_int(
-                round(reads_size / (estimated[0] * sample_factor))
+                round(reads_size / (estimated[0] * sample_factor * orig_sample_factor))
             )
     if orig is not None and any(orig):
         output_data.update(params_to_dict(('provided_%s' % name for name in model.params), orig))
