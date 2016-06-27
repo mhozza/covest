@@ -186,7 +186,7 @@ def main(args):
                 res, guess, orig,
                 reads_size=args.reads_size,
                 orig_sample_factor=orig_sample_factor,
-                starting_points=args.starting_poins,
+                starting_points=args.starting_points,
                 use_grid_search=args.grid,
             )
 
