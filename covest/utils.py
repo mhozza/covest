@@ -1,3 +1,4 @@
+import subprocess
 import sys
 from math import log, exp
 
@@ -51,3 +52,12 @@ def nonefloat(x):
         return float(x)
     except ValueError:
         return None
+
+
+def run(command, shell=False, output=None, verbose=False):
+    if verbose:
+        print(command, file=sys.stderr)
+    f = open(output, 'w') if output else None
+    if not shell:
+        command = command.split()
+    return subprocess.call(command, shell=shell, stdout=f)
