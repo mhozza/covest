@@ -134,13 +134,13 @@ def trim_hist(hist, threshold):
     return {k: v for k, v in h.items() if v > 0}, tail
 
 
-def process_histogram(hist, k, r, trim=None, sample_factor=None):
+def process_histogram(hist, k, r, trim=None, sample_factor=None, max_notrim=constants.MAX_NOTRIM):
     hist = dict(hist)
     tail = 0
     if sample_factor is not None and sample_factor > 1:
         verbose_print('Sampling histogram...')
         hist = sample_histogram(hist, sample_factor, trim)
-    if sample_factor is None:
+    if sample_factor is None and max(hist) > max_notrim:
         verbose_print('Sampling histogram...')
         hist, sample_factor, c, e = auto_sample_hist(hist, k, r, trim=trim)
         if sample_factor > 1:
@@ -149,10 +149,13 @@ def process_histogram(hist, k, r, trim=None, sample_factor=None):
             verbose_print('No sampling necessary')
     else:
         c, e = compute_coverage_apx(hist, k, r)
+        if sample_factor is None:
+            sample_factor = 1
     if trim is None:
-        trim = get_trim(hist, ignore_last=True)
-        verbose_print('Trimming at: {}'.format(trim))
-        hist, tail = trim_hist(hist, trim)
+        if max(hist) > max_notrim:
+            trim = get_trim(hist, ignore_last=True)
+            verbose_print('Trimming at: {}'.format(trim))
+            hist, tail = trim_hist(hist, trim)
     elif trim > 0:
         verbose_print('Trimming at: {}'.format(trim))
         hist, tail = trim_hist(hist, trim)

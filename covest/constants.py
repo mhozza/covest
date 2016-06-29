@@ -18,6 +18,7 @@ AUTO_SAMPLE_TARGET_COVERAGE = 12
 AUTO_TRIM_PRECISION = 6
 NOISE_THRESHOLD = 10**-6
 MAX_ERRORS = 8
+MAX_NOTRIM = 25
 
 try:
     from multiprocessing import cpu_count
