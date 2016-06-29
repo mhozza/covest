@@ -60,7 +60,7 @@ setup(
     },
     scripts=[
         'bin/gsest.py',
-        'bin/read_size.py',
+        'bin/reads_size.py',
         'bin/fasta_length.py',
         'bin/kmer_hist.py',
         'bin/read_sampler.py',

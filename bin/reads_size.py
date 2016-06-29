@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 import argparse
-from covest.covest import count_reads_size
+
+from covest.data import count_reads_stats
 
 
 def main(args):
-    rc = count_reads_size(args.reads)
-    print(rc)
+    print(count_reads_stats(args.reads)[1])
 
 
 if __name__ == '__main__':
