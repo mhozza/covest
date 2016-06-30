@@ -13,7 +13,7 @@ def main(args):
         with open(str(args.config)) as f:
             config = json.load(f)
         config['reads_size'] = rs
-        config['read-length'] = ar
+        config['r'] = ar
         with open(str(args.config), 'w') as f:
             json.dump(config, f)
 
