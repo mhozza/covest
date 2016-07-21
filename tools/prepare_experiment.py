@@ -78,6 +78,7 @@ def sample_reads(reads_file, config, sample_info):
     if 'r' in config:
         del config['r']
     reads_file.unlink()
+    reads_file.suffix = '.fa'
     shutil.move(rf_sampled, str(reads_file))
 
     return reads_file, config
@@ -87,8 +88,10 @@ def generate_config(reads_file, src_config_file=None):
     try:
         with open(str(src_config_file), 'r') as f:
             config = json.load(f)
-    except Exception:
+    except Exception as e:
         config = dict()
+        if src_config_file is not None:
+            print(src_config_file, e, file=sys.stderr)
     config['reads'] = str(reads_file.name)
     return config
 
@@ -175,7 +178,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--run-script', type=Path, default=Path(__file__).parent / 'run_covest.py',
                         help='Experiment runner: script for running the experiment')
     parser.add_argument('-i', '--info', nargs=2, help='Read info: avg_read_length, total_reads_size')
-    parser.add_argument('-c', '--config-file', type=Path, nargs=1, help='config file')
+    parser.add_argument('-c', '--config-file', type=Path, help='config file')
     parser.add_argument('-f', '--force', action='store_true',
                         help='force use existing path')
     parser.add_argument('--copy', action='store_true', help='copy files instead of linking')
