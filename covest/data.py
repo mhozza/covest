@@ -3,11 +3,11 @@ from collections import namedtuple
 from os import path
 
 import yaml
-from Bio import SeqIO
-from first import first
 
+from Bio import SeqIO
 from covest import __version__
-from .models import models, BasicModel
+
+from .models import BasicModel, models, select_model
 from .utils import safe_int, verbose_print
 
 
@@ -77,16 +77,17 @@ def parse_data(f):
     data = yaml.load(f)
     try:
         model_class_name = data['model']
-        model = first(models.values(), key=lambda x: x.__name__ == model_class_name)
+        model = select_model(model_class_name)
     except KeyError:
         model = BasicModel
+    sample_factor = data.get('sample_factor', 1)
     guess = [
         data.get('guessed_coverage', None),
         data.get('guessed_error_rate', None),
     ]
     estimated = [data.get(k, None) for k in model.params]
-    return namedtuple('ParsedData', ('estimated', 'guess', 'model'))(
-        estimated=estimated, guess=guess, model=model
+    return namedtuple('ParsedData', ('estimated', 'guess', 'model', 'sample_factor'))(
+        estimated=estimated, guess=guess, model=model, sample_factor=sample_factor,
     )
 
 

@@ -15,11 +15,11 @@ from covest.utils import safe_log, fix_zero
 MODEL_CLASS_SUFFIX = 'Model'
 
 class BasicModel:
+    params = ('coverage', 'error_rate')
     def __init__(self, k, r, hist, tail, max_error=None, max_cov=None, *args, **kwargs):
         self.repeats = False
         self.k = k
         self.r = r
-        self.params = ('coverage', 'error_rate')
         self.bounds = ((0.01, max_cov), (0, 0.5))
         self.defaults = (1, self._default_param(1))
         self.comb = [comb(k, s) * (3 ** s) for s in range(k + 1)]
@@ -171,11 +171,11 @@ class BasicModel:
 
 
 class RepeatsModel(BasicModel):
+    params = BasicModel.params + ('q1', 'q2', 'q')
     def __init__(self, k, r, hist, tail, max_error=None, max_cov=None, threshold=1e-8,
                  min_single_copy_ratio=0.3, *args, **kwargs):
         super(RepeatsModel, self).__init__(k, r, hist, tail, max_error=max_error)
         self.repeats = True
-        self.params = self.params + ('q1', 'q2', 'q')
         self.bounds = self.bounds +  ((min_single_copy_ratio, 1), (0, 1), (0, 1))
         self.defaults = self.defaults + tuple(
             self._default_param(i, default=0.5) for i in range(2, 5)

@@ -138,7 +138,7 @@ def process_histogram(hist, k, r, trim=None, sample_factor=None, max_notrim=cons
     hist = dict(hist)
     tail = 0
     if sample_factor is not None and sample_factor > 1:
-        verbose_print('Sampling histogram...')
+        verbose_print('Sampling histogram {}x...'.format(sample_factor))
         hist = sample_histogram(hist, sample_factor, trim)
     if sample_factor is None and max(hist) > max_notrim:
         verbose_print('Sampling histogram...')

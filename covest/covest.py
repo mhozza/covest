@@ -97,6 +97,11 @@ class CoverageEstimator:
 
 @running_time_decorator
 def main(args):
+    # Load saved data
+    if args.load:
+        with open(args.load) as f:
+            parsed_data = parse_data(f)
+            args.sample_factor = parsed_data.sample_factor
     # Load histogram
     verbose_print('Loading histogram {} with parameters k={} r={}.'.format(
         args.input_histogram, args.kmer_size, args.read_length,
@@ -144,11 +149,9 @@ def main(args):
         ll = model.compute_loglikelihood(*orig)
         print('Loglikelihood:', ll)
     else:
-        if args.load:  # Load saved data, don't estimate anything
-            with open(args.load) as f:
-                parsed_data = parse_data(f)
-                guess = parsed_data.guess
-                res = parsed_data.estimated
+        if args.load:  # Don't estimate anything
+            guess = parsed_data.guess
+            res = parsed_data.estimated
         else:
             verbose_print('Estimating coverage...')
             # Compute initial guess
@@ -217,8 +220,8 @@ def run():
     parser.add_argument('-T', '--thread-count', default=constants.DEFAULT_THREAD_COUNT, type=int,
                         help='Thread count')
     parser.add_argument('--plot', type=bool, nargs='?', const=False,
-                        help='Plot probabilities (use --plot 1 to plot probs * j)')
-    parser.add_argument('--load', type=str, help='Load json')
+                        help='Plot probabilities (use --plot 1 to plot "probs * j")')
+    parser.add_argument('--load', type=str, help='Load covest output file')
     parser.add_argument('-t', '--trim', type=int, default=None,
                         help='Trim histogram at this value. '
                              'Set to 0 to disable automatic trimming.')
