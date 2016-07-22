@@ -28,5 +28,6 @@ python:
 - 3.5
 - 3.4
 script: ./setup.py test
+sudo: required
 before_install:
 - sudo apt-get install build-essential gfortran libatlas-base-dev python-dev
