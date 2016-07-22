@@ -16,6 +16,7 @@ READS_FILE_NAME_TEMPLATE = 'reads{}'
 CONFIG_FILENAME = 'config.json'
 HISTOGRAM_FILENAME = 'reads.hist'
 RUNSCRIPT_FILENAME = 'run'
+CURRENT_DIR = Path(__file__).parent
 
 
 def mkdir(dest_dir, force=False):
@@ -26,6 +27,21 @@ def mkdir(dest_dir, force=False):
         dest_dir.mkdir()
     except FileExistsError:
         pass
+
+
+def get_reads_from_sequence(src_file, dest_dir, coverage):
+    print('Generating reads file...', file=sys.stderr)
+    dest = dest_dir / READS_FILE_NAME_TEMPLATE.format(src_file.suffix)
+    if dest.exists():
+        dest.unlink()
+
+    src = str(src_file.resolve())
+    dst = str(dest)
+
+    command = CURRENT_DIR / 'simulator/read_simulator.py'
+    run('{} {} {} -c {}'.format(command, src, dst, coverage), shell=True, verbose=True)
+
+    return dest
 
 
 def get_reads_data(src_file, dest_dir, link=True):
@@ -56,7 +72,8 @@ def sample_reads(reads_file, config, sample_info):
         c = rs / gs
         factor = c / tc
         print(
-            'Current coverage: {c}, target coverage: {tc}, genome size: {gs}, factor: {factor}'.format(
+            'Current coverage: {c}, target coverage: {tc}, genome size: {gs}, '
+            'factor: {factor}'.format(
                 c=c, tc=tc, gs=gs, factor=factor
             ),
             file=sys.stderr
@@ -153,10 +170,13 @@ def write_config(config, dest_dir):
         json.dump(config, f)
 
 
-def pipeline(src_file, dest_dir, link=True, force=False, run_script_filename=None, sample=None, read_info=None,
-             src_config_file=None, clean=False):
+def pipeline(src_file, dest_dir, link=True, force=False, run_script_filename=None, sample=None,
+             read_info=None, src_config_file=None, clean=False, generate_coverage=None):
     mkdir(dest_dir, force=force)
-    reads_file = get_reads_data(src_file, dest_dir, link=link)
+    if generate_coverage is None:
+        reads_file = get_reads_data(src_file, dest_dir, link=link)
+    else:
+        reads_file = get_reads_from_sequence(src_file, dest_dir, generate_coverage)
     try:
         config = generate_config(reads_file, src_config_file)
         if sample is not None:
@@ -175,18 +195,21 @@ if __name__ == '__main__':
     parser.add_argument('name', type=Path, help='directory')
     parser.add_argument('-s', '--sample', nargs='+', type=float,
                         help='Sample info: either target_coverage genome_size, or factor')
-    parser.add_argument('-r', '--run-script', type=Path, default=Path(__file__).parent / 'run_covest.py',
+    parser.add_argument('-r', '--run-script', type=Path,
+                        default=Path(__file__).parent / 'run_covest.py',
                         help='Experiment runner: script for running the experiment')
-    parser.add_argument('-i', '--info', nargs=2, help='Read info: avg_read_length, total_reads_size')
+    parser.add_argument('-i', '--info', nargs=2,
+                        help='Read info: avg_read_length, total_reads_size')
     parser.add_argument('-c', '--config-file', type=Path, help='config file')
     parser.add_argument('-f', '--force', action='store_true',
                         help='force use existing path')
     parser.add_argument('--copy', action='store_true', help='copy files instead of linking')
     parser.add_argument('--clean', action='store_true', help='clean jellyfish files')
+    parser.add_argument('-g', '--generate', help='generate reads form sequence with coverage')
 
     args = parser.parse_args()
     pipeline(
         args.source, args.name, link=not args.copy, force=args.force, sample=args.sample,
         run_script_filename=args.run_script, read_info=args.info, src_config_file=args.config_file,
-        clean=args.clean,
+        clean=args.clean, generate_coverage=args.generate,
     )
