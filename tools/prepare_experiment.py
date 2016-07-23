@@ -29,30 +29,35 @@ def mkdir(dest_dir, force=False):
         pass
 
 
-def get_reads_from_sequence(src_file, dest_dir, coverage):
+def get_reads_from_sequence(src_file, dest_dir, coverage, use_art=False):
+    src = str(src_file.resolve())
     print('Generating reads file...', file=sys.stderr)
-    dest = dest_dir / READS_FILE_NAME_TEMPLATE.format(src_file.suffix)
+    dest = dest_dir / READS_FILE_NAME_TEMPLATE.format('.fq' if use_art else '.fa')
     if dest.exists():
         dest.unlink()
 
-    src = str(src_file.resolve())
-    dst = str(dest)
-
-    command = CURRENT_DIR / 'simulator/read_simulator.py'
-    run('{} {} {} -c {}'.format(command, src, dst, coverage), shell=True, verbose=True)
+    if use_art:
+        dst = str(dest.parent / dest.stem)
+        run(
+            'art_illumina -i {} -o {} -f {} -l 100'.format(src, dst, coverage),
+            shell=True, verbose=True,
+        )
+    else:
+        dst = str(dest)
+        command = CURRENT_DIR / 'simulator/read_simulator.py'
+        run('{} {} {} -c {}'.format(command, src, dst, coverage), shell=True, verbose=True)
 
     return dest
 
 
 def get_reads_data(src_file, dest_dir, link=True):
+    src = str(src_file.resolve())
     print('Obtaining reads file...', file=sys.stderr)
     dest = dest_dir / READS_FILE_NAME_TEMPLATE.format(src_file.suffix)
-
     if dest.exists():
         dest.unlink()
-
-    src = str(src_file.resolve())
     dst = str(dest)
+
     if link:
         os.symlink(src, dst)
     else:
@@ -171,12 +176,13 @@ def write_config(config, dest_dir):
 
 
 def pipeline(src_file, dest_dir, link=True, force=False, run_script_filename=None, sample=None,
-             read_info=None, src_config_file=None, clean=False, generate_coverage=None):
+             read_info=None, src_config_file=None, clean=False, generate_coverage=None,
+             use_art=False):
     mkdir(dest_dir, force=force)
     if generate_coverage is None:
         reads_file = get_reads_data(src_file, dest_dir, link=link)
     else:
-        reads_file = get_reads_from_sequence(src_file, dest_dir, generate_coverage)
+        reads_file = get_reads_from_sequence(src_file, dest_dir, generate_coverage, use_art=use_art)
     try:
         config = generate_config(reads_file, src_config_file)
         if sample is not None:
@@ -206,10 +212,12 @@ if __name__ == '__main__':
     parser.add_argument('--copy', action='store_true', help='copy files instead of linking')
     parser.add_argument('--clean', action='store_true', help='clean jellyfish files')
     parser.add_argument('-g', '--generate', help='generate reads form sequence with coverage')
+    parser.add_argument('--art', action='store_true',
+                        help='Use art to generate reads. Use with --generate option')
 
     args = parser.parse_args()
     pipeline(
         args.source, args.name, link=not args.copy, force=args.force, sample=args.sample,
         run_script_filename=args.run_script, read_info=args.info, src_config_file=args.config_file,
-        clean=args.clean, generate_coverage=args.generate,
+        clean=args.clean, generate_coverage=args.generate, use_art=args.art,
     )
