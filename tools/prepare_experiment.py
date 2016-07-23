@@ -45,7 +45,7 @@ def get_reads_from_sequence(src_file, dest_dir, coverage, use_art=False):
     else:
         dst = str(dest)
         command = CURRENT_DIR / 'simulator/read_simulator.py'
-        run('{} {} {} -c {}'.format(command, src, dst, coverage), shell=True, verbose=True)
+        run('{} {} {} -c {} -s'.format(command, src, dst, coverage), shell=True, verbose=True)
 
     return dest
 

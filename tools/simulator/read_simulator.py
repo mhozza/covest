@@ -31,13 +31,42 @@ def reverse_complement(seq):
     return ''.join(complement[x] for x in reversed(seq))
 
 
-def main(fname, genome_file, read_length, error_rate, coverage, error_free_fname=None):
+def substitute(sequence):
+    subst_table = {
+        'W': ('A', 'T'),
+        'S': ('C', 'G'),
+        'M': ('A', 'C'),
+        'K': ('G', 'T'),
+        'R': ('A', 'G'),
+        'Y': ('C', 'T'),
+        'B': ('C', 'G', 'T'),
+        'D': ('A', 'G', 'T'),
+        'H': ('A', 'C', 'T'),
+        'V': ('A', 'C', 'G'),
+        'N': ('A', 'C', 'G', 'T'),
+    }
+
+    def subst(ch):
+        if ch in BASES:
+            return ch
+        else:
+            return random.choice(subst_table[ch])
+
+    return ''.join(
+        subst(ch) for ch in sequence
+    )
+
+
+def main(fname, genome_file, read_length, error_rate, coverage, error_free_fname=None,
+         substitude_nucleotides=False):
     total_genome_size = 0
     with open(fname, 'w') as f:
         if error_free_fname:
             eff = open(error_free_fname, 'w')
         for genome_id, genome in load_reads(genome_file):
             genome = genome.upper()
+            if substitude_nucleotides:
+                genome = substitute(genome)
             genome_size = len(genome)
             total_genome_size += genome_size
             read_count = int(round((coverage * genome_size) / float(read_length)))
@@ -68,6 +97,8 @@ if __name__ == '__main__':
                         default=DEFAULT_ERROR_RATE, help='Error rate')
     parser.add_argument('-r', '--read-length', type=int,
                         default=DEFAULT_READ_LENGTH, help='Read length')
+    parser.add_argument('-s', '--substitude', action='store_true',
+                        help='Substitude extended nucleotides')
     parser.add_argument('-f', '--error-free', help='Error free output file')
     parser.add_argument('genome', help='Genome file')
     parser.add_argument('output', help='Output file')
@@ -75,4 +106,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args.output, args.genome, args.read_length, args.error_rate,
-         args.coverage, args.error_free)
+         args.coverage, args.error_free, args.substitude)
