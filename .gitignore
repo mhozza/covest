@@ -1,7 +1,7 @@
 khmer*
 /data/
 img/
-art_bin_VanillaIceCream/
+art_bin*/
 .ipynb*
 __pycache__/
 bamUtil/
