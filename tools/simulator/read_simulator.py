@@ -4,6 +4,7 @@ import argparse
 from os import path
 from Bio import SeqIO
 
+from covest.data import load_reads
 
 BASES = ['A', 'C', 'G', 'T', ]
 
@@ -30,40 +31,34 @@ def reverse_complement(seq):
     return ''.join(complement[x] for x in reversed(seq))
 
 
-def load_reads(fname):
-    _, ext = path.splitext(fname)
-    fmt = 'fasta'
-    if ext == '.fq' or ext == '.fastq':
-        fmt = 'fastq'
-    with open(fname, "rU") as f:
-        for read in SeqIO.parse(f, fmt):
-            yield read.seq
-
-
 def main(fname, genome_file, read_length, error_rate, coverage, error_free_fname=None):
-    genome = list(load_reads(genome_file))[0].upper()
-    genome_size = len(genome)
-    read_count = int(round((coverage * genome_size) / float(read_length)))
+    total_genome_size = 0
     with open(fname, 'w') as f:
         if error_free_fname:
             eff = open(error_free_fname, 'w')
+        for genome_id, genome in load_reads(genome_file):
+            genome = genome.upper()
+            genome_size = len(genome)
+            total_genome_size += genome_size
+            read_count = int(round((coverage * genome_size) / float(read_length)))
 
-        for i in range(read_count):
-            pos = random.randrange(genome_size - read_length)
-            original_read = genome[pos:pos + read_length]
-            original_read = original_read if random.randrange(2)\
-                else reverse_complement(original_read)
-            read = ''.join(b if random.random() >= error_rate else other(b)
-                           for b in original_read)
-            f.write('>read_{}-{}\n'.format(i, pos))
-            f.write('{}\n'.format(read))
-            if error_free_fname:
-                eff.write('>read_{}-{}\n'.format(i, pos))
-                eff.write('{}\n'.format(original_read))
+            for i in range(read_count):
+                pos = random.randrange(genome_size - read_length)
+                original_read = genome[pos:pos + read_length]
+                original_read = original_read if random.randrange(2)\
+                    else reverse_complement(original_read)
+                read = ''.join(b if random.random() >= error_rate else other(b)
+                               for b in original_read)
+                f.write('>read_{}_{}-{}\n'.format(genome_id, i, pos))
+                f.write('{}\n'.format(read))
+                if error_free_fname:
+                    eff.write('>read_{}_{}-{}\n'.format(genome_id, i, pos))
+                    eff.write('{}\n'.format(original_read))
 
         if error_free_fname:
             eff.close()
 
+    print('Total genome size:', total_genome_size)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Simulate reads form random genome with errors')
