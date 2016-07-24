@@ -82,10 +82,10 @@ class CoverageEstimator:
 
             if use_grid_search:
                 verbose_print('Starting grid search with guess: {}'.format(r))
-                r = optimize_grid(
+                r = list(optimize_grid(
                     self.likelihood_f, r, bounds=self.bounds,
                     fix=self.fix, n_threads=n_threads,
-                )
+                ))
         except KeyboardInterrupt:
             pass
         verbose_print('Estimation finished with status: %s.' % (
