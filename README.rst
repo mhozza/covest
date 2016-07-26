@@ -56,7 +56,7 @@ Output Specification:
 ~~~~~~~~~~~~~~~~~~~~~
 CovEst outputs it's results in simple subset of YAML format for best human readability and possibility of machine processing.
 
-The output are lines containing ``key: value``. The most important keys are ``coverage`` and ``genome_size`` (or ``genome_size_reads`` if read file was specified).
+The output are lines containing ``key: value``. The most important keys are ``coverage`` and ``genome_size`` (or ``genome_size_reads`` if reads size was specified).
 
 Other included tools
 --------------------
