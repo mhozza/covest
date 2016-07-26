@@ -18,7 +18,7 @@ requirements = [
     'matplotlib',
     'numpy',
     'pystache',
-    'scipy<0.16',
+    'scipy>=0.18',
     'pyfasta',
     'first',
     'pyyaml',
