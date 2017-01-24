@@ -5,6 +5,7 @@ from pathlib import Path
 from scipy.optimize import minimize
 
 from covest import version_string
+
 from . import constants
 from .data import load_histogram, parse_data, print_output, save_histogram
 from .grid import initial_grid, optimize_grid
@@ -162,13 +163,14 @@ def main(args):
                 if not (guess_c == 0 and guess_e == 1):  # We were able to guess cov and e
                     guess[:2] = guess_c, guess_e
                 if fix:
-                    for i, v in fix:
+                    for i, v in enumerate(fix):
                         if v is not None:
                             guess[i] = v
             guess_ll = model.compute_loglikelihood(*guess)
             if guess_ll == -constants.INF:
                 verbose_print(
-                    'Unable to compute likelihood. Please, try to trim the histogram, or use more complex model'
+                    'Unable to compute likelihood. '
+                    'Please, try to trim the histogram, or use more complex model'
                 )
                 exit(1)
             verbose_print('Initial guess: {} ll:{}'.format(
