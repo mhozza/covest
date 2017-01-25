@@ -61,7 +61,7 @@ class CoverageEstimator:
                         )
                     r = res.x
             elif starting_points > 1:
-                params = initial_grid(r, count=starting_points, bounds=self.bounds)
+                params = initial_grid(r, count=starting_points, bounds=self.bounds, fix=self.fix)
                 with running_time('Initial grid optimization'):
                     min_r = None
                     with Pool(n_threads) as pool:
