@@ -8,6 +8,8 @@ reads.
     :target: https://badge.fury.io/py/covest
 .. image:: https://travis-ci.org/mhozza/covest.svg?branch=master
     :target: https://travis-ci.org/mhozza/covest
+    
+This model is further extended with models for polymorphism in https://github.com/wernerkrampl/covest.
 
 Requirements
 ------------
