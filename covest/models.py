@@ -7,7 +7,7 @@ from functools import lru_cache
 from math import exp, fsum
 
 import matplotlib.pyplot as plt
-from scipy.misc import comb
+from scipy.special import comb
 
 from covest import constants
 from covest.utils import safe_log, fix_zero
